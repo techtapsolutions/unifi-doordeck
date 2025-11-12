@@ -4,8 +4,14 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import * as path from 'path';
+
+// Use absolute path for sandbox mode compatibility
+const sharedPath = path.join(__dirname, '../shared/types');
+const { IPCChannel } = require(sharedPath);
+
+// Import types separately for TypeScript
 import type { BridgeAPI } from '../shared/ipc';
-import { IPCChannel } from '../shared/types';
 
 /**
  * Bridge API implementation
