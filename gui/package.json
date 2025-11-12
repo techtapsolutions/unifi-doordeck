@@ -30,7 +30,7 @@
     "access-control",
     "gui"
   ],
-  "author": "",
+  "author": "Tech Tap Solutions",
   "license": "MIT",
   "engines": {
     "node": ">=20.0.0"
@@ -41,16 +41,17 @@
     "react-router-dom": "^6.26.1"
   },
   "devDependencies": {
+    "@types/node": "^20.14.15",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "@types/node": "^20.14.15",
-    "@vitejs/plugin-react": "^4.3.1",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^8.2.2",
     "electron": "^32.0.1",
     "electron-builder": "^25.0.5",
     "eslint": "^8.57.0",
+    "png-to-ico": "^3.0.1",
     "prettier": "^3.3.3",
     "rimraf": "^5.0.5",
     "typescript": "^5.5.4",
@@ -74,11 +75,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico",
@@ -102,7 +107,9 @@
       "runAfterFinish": true,
       "menuCategory": true,
       "displayLanguageSelector": false,
-      "installerLanguages": ["en_US"],
+      "installerLanguages": [
+        "en_US"
+      ],
       "warningsAsErrors": false
     },
     "portable": {
