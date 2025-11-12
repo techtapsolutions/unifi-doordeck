@@ -71,6 +71,9 @@
       "assets/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "dist/shared/**/*"
+    ],
     "win": {
       "target": [
         {
