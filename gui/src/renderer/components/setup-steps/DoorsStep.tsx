@@ -29,11 +29,16 @@ export default function DoorsStep({
 
   async function handleDiscover() {
     console.log('[DoorsStep] Starting door discovery...');
+    console.log('[DoorsStep] Using unifiConfig:', {
+      host: unifiConfig.host,
+      hasApiKey: !!unifiConfig.apiKey,
+      hasUsername: !!unifiConfig.username,
+    });
     setDiscovering(true);
 
     try {
-      console.log('[DoorsStep] Calling window.bridge.discoverDoors()...');
-      const response = await window.bridge.discoverDoors();
+      console.log('[DoorsStep] Calling window.bridge.discoverDoorsWithConfig()...');
+      const response = await window.bridge.discoverDoorsWithConfig(unifiConfig);
       console.log('[DoorsStep] Discovery response:', response);
 
       if (response.success && response.data) {

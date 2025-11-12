@@ -157,6 +157,7 @@ export enum IPCChannel {
   // Setup wizard
   SETUP_TEST_UNIFI = 'setup:test:unifi',
   SETUP_TEST_DOORDECK = 'setup:test:doordeck',
+  SETUP_DISCOVER_DOORS = 'setup:discover:doors',
   SETUP_COMPLETE = 'setup:complete',
 }
 

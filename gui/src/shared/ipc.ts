@@ -51,6 +51,7 @@ export interface BridgeAPI {
   // Setup wizard
   testUniFiConnection: (config: UniFiConfig) => Promise<APIResponse<boolean>>;
   testDoordeckConnection: (config: DoordeckConfig) => Promise<APIResponse<boolean>>;
+  discoverDoorsWithConfig: (config: UniFiConfig) => Promise<APIResponse<Door[]>>;
   completeSetup: (config: BridgeConfig) => Promise<APIResponse<void>>;
 }
 

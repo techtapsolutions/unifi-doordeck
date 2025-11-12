@@ -57,6 +57,7 @@ export function setupIPC(ipcMain: IpcMain, mainWindow: BrowserWindow): void {
   // Setup wizard handlers
   ipcMain.handle(IPCChannel.SETUP_TEST_UNIFI, handleTestUniFi);
   ipcMain.handle(IPCChannel.SETUP_TEST_DOORDECK, handleTestDoordeck);
+  ipcMain.handle(IPCChannel.SETUP_DISCOVER_DOORS, handleDiscoverDoorsWithConfig);
   ipcMain.handle(IPCChannel.SETUP_COMPLETE, handleSetupComplete);
 
   // Setup event polling to push updates to renderer
@@ -346,6 +347,40 @@ async function handleTestDoordeck(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to test Doordeck connection',
+    };
+  }
+}
+
+async function handleDiscoverDoorsWithConfig(
+  _event: any,
+  config: UniFiConfig
+): Promise<APIResponse<Door[]>> {
+  console.log('[IPC] handleDiscoverDoorsWithConfig called with config');
+  try {
+    console.log('[IPC] Config has:', {
+      hasHost: !!config.host,
+      hasApiKey: !!config.apiKey,
+    });
+
+    // Use standalone door discovery with provided config
+    const result = await discoverUniFiDoors(config);
+    console.log('[IPC] Discovery result:', result);
+
+    if (result.success && result.doors) {
+      console.log('[IPC] Returning', result.doors.length, 'doors');
+      return { success: true, data: result.doors };
+    } else {
+      console.error('[IPC] Discovery failed:', result.error);
+      return {
+        success: false,
+        error: result.error || 'Failed to discover doors',
+      };
+    }
+  } catch (error) {
+    console.error('[IPC] Exception in handleDiscoverDoorsWithConfig:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to discover doors',
     };
   }
 }

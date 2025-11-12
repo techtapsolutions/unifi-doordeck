@@ -63,6 +63,7 @@ const bridgeAPI: BridgeAPI = {
   // Setup wizard
   testUniFiConnection: (config) => ipcRenderer.invoke(IPCChannel.SETUP_TEST_UNIFI, config),
   testDoordeckConnection: (config) => ipcRenderer.invoke(IPCChannel.SETUP_TEST_DOORDECK, config),
+  discoverDoorsWithConfig: (config) => ipcRenderer.invoke(IPCChannel.SETUP_DISCOVER_DOORS, config),
   completeSetup: (config) => ipcRenderer.invoke(IPCChannel.SETUP_COMPLETE, config),
 };
 

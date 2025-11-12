@@ -372,6 +372,12 @@ export async function discoverUniFiDoors(config: UniFiConfig): Promise<{ success
 
     if (!config.apiKey) {
       console.error('[DoorDiscovery] No API key provided');
+      if (config.username) {
+        return {
+          success: false,
+          error: 'Door discovery requires API key authentication. Please go back and configure with an API key instead of username/password.'
+        };
+      }
       return { success: false, error: 'API key is required for door discovery' };
     }
 
