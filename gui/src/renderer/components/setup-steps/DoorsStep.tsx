@@ -28,21 +28,32 @@ export default function DoorsStep({
   }, []);
 
   async function handleDiscover() {
+    console.log('[DoorsStep] Starting door discovery...');
     setDiscovering(true);
 
     try {
+      console.log('[DoorsStep] Calling window.bridge.discoverDoors()...');
       const response = await window.bridge.discoverDoors();
+      console.log('[DoorsStep] Discovery response:', response);
+
       if (response.success && response.data) {
+        console.log('[DoorsStep] Success! Found', response.data.length, 'doors');
+        console.log('[DoorsStep] Doors:', response.data);
         setDoors(response.data);
         onDoorsDiscovered(response.data);
 
         // Auto-select all doors
         const allIds = new Set(response.data.map((d) => d.id));
         setSelectedDoors(allIds);
+      } else {
+        console.error('[DoorsStep] Discovery failed or no doors found');
+        console.error('[DoorsStep] Error:', response.error);
+        setDoors([]);
       }
     } catch (error) {
-      console.error('Failed to discover doors:', error);
+      console.error('[DoorsStep] Exception during discovery:', error);
     } finally {
+      console.log('[DoorsStep] Discovery complete');
       setDiscovering(false);
     }
   }

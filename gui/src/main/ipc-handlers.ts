@@ -187,28 +187,42 @@ async function handleDoorsList(): Promise<APIResponse<Door[]>> {
 }
 
 async function handleDoorsDiscover(): Promise<APIResponse<Door[]>> {
+  console.log('[IPC] handleDoorsDiscover called');
   try {
     // During setup wizard, use standalone door discovery
     // After setup, use bridge service
     const config = await configManager.getConfig();
+    console.log('[IPC] Got config:', {
+      hasConfig: !!config,
+      hasUnifi: !!(config && config.unifi),
+      hasHost: !!(config && config.unifi && config.unifi.host),
+      hasApiKey: !!(config && config.unifi && config.unifi.apiKey),
+    });
 
     if (config && config.unifi && config.unifi.host && config.unifi.apiKey) {
+      console.log('[IPC] Using standalone door discovery');
       // Use standalone door discovery
       const result = await discoverUniFiDoors(config.unifi);
+      console.log('[IPC] Discovery result:', result);
       if (result.success && result.doors) {
+        console.log('[IPC] Returning', result.doors.length, 'doors');
         return { success: true, data: result.doors };
       } else {
+        console.error('[IPC] Discovery failed:', result.error);
         return {
           success: false,
           error: result.error || 'Failed to discover doors',
         };
       }
     } else {
+      console.log('[IPC] Trying bridge service');
       // Try bridge service (for when setup is complete and service is running)
       try {
         const doors = await bridgeClient.discoverDoors();
+        console.log('[IPC] Bridge service returned', doors.length, 'doors');
         return { success: true, data: doors };
       } catch (error) {
+        console.error('[IPC] Bridge service failed:', error);
         return {
           success: false,
           error: 'Please configure UniFi settings with API key first',
@@ -216,6 +230,7 @@ async function handleDoorsDiscover(): Promise<APIResponse<Door[]>> {
       }
     }
   } catch (error) {
+    console.error('[IPC] Exception in handleDoorsDiscover:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to discover doors',
