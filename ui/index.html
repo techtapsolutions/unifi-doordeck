@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniFi-Doordeck Bridge Configuration</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 UniFi-Doordeck Bridge</h1>
+            <p class="subtitle">Configuration & Monitoring</p>
+        </header>
+
+        <!-- Status Panel -->
+        <div class="status-panel" id="statusPanel">
+            <div class="status-item">
+                <span class="status-label">Service Status:</span>
+                <span class="status-value" id="serviceStatus">Loading...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">UniFi Connection:</span>
+                <span class="status-value" id="unifiStatus">Loading...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Doordeck Connection:</span>
+                <span class="status-value" id="doordeckStatus">Loading...</span>
+            </div>
+        </div>
+
+        <!-- Alert Messages -->
+        <div id="alertContainer"></div>
+
+        <!-- Configuration Form -->
+        <div class="config-section">
+            <h2>🌐 UniFi Access Configuration</h2>
+            <form id="configForm">
+                <div class="form-group">
+                    <label for="unifiHost">UniFi Controller Host</label>
+                    <input type="text" id="unifiHost" name="unifiHost"
+                           placeholder="https://your-controller.local" required>
+                    <small>Include https:// or http://</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="unifiUsername">Username</label>
+                    <input type="text" id="unifiUsername" name="unifiUsername"
+                           placeholder="admin" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="unifiPassword">Password</label>
+                    <input type="password" id="unifiPassword" name="unifiPassword"
+                           placeholder="••••••••" required>
+                    <small>UniFi Access administrator password</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="unifiSite">Site</label>
+                    <input type="text" id="unifiSite" name="unifiSite"
+                           placeholder="default" value="default">
+                    <small>UniFi site name (usually "default")</small>
+                </div>
+
+                <h2>🚪 Doordeck Configuration</h2>
+
+                <div class="form-group">
+                    <label for="doordeckApiKey">API Key</label>
+                    <input type="text" id="doordeckApiKey" name="doordeckApiKey"
+                           placeholder="your-api-key" required>
+                    <small>Get from Doordeck Dashboard</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="doordeckSecretKey">Secret Key</label>
+                    <input type="password" id="doordeckSecretKey" name="doordeckSecretKey"
+                           placeholder="your-secret-key" required>
+                    <small>Keep this secure</small>
+                </div>
+
+                <h2>⚙️ Server Configuration</h2>
+
+                <div class="form-group">
+                    <label for="serverPort">Port</label>
+                    <input type="number" id="serverPort" name="serverPort"
+                           placeholder="3000" value="3000" min="1" max="65535">
+                    <small>Web interface port (restart required)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="loggingLevel">Logging Level</label>
+                    <select id="loggingLevel" name="loggingLevel">
+                        <option value="error">Error</option>
+                        <option value="warn">Warning</option>
+                        <option value="info" selected>Info</option>
+                        <option value="debug">Debug</option>
+                    </select>
+                    <small>More verbose = more disk space</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">💾 Save Configuration</button>
+                    <button type="button" class="btn btn-secondary" onclick="testConnection()">🔌 Test Connection</button>
+                    <button type="button" class="btn btn-secondary" onclick="loadConfig()">🔄 Reload</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Service Control -->
+        <div class="config-section">
+            <h2>🎛️ Service Control</h2>
+            <div class="service-controls">
+                <button class="btn btn-success" onclick="startService()">▶️ Start Service</button>
+                <button class="btn btn-warning" onclick="stopService()">⏹️ Stop Service</button>
+                <button class="btn btn-info" onclick="restartService()">🔄 Restart Service</button>
+            </div>
+        </div>
+
+        <!-- Logs Panel -->
+        <div class="config-section">
+            <h2>📋 Recent Logs</h2>
+            <div class="logs-container">
+                <div class="logs-header">
+                    <button class="btn btn-small" onclick="refreshLogs()">🔄 Refresh</button>
+                    <button class="btn btn-small" onclick="clearLogs()">🗑️ Clear Display</button>
+                </div>
+                <pre id="logsContent" class="logs-content">Loading logs...</pre>
+            </div>
+        </div>
+
+        <footer>
+            <p>UniFi-Doordeck Bridge v0.1.0 | <a href="https://github.com/techtap/unifi-doordeck-bridge" target="_blank">Documentation</a></p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

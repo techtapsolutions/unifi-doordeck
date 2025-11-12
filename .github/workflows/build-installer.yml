@@ -1,0 +1,112 @@
+name: Build Windows Installer
+
+on:
+  # Trigger on new releases
+  release:
+    types: [created]
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: false
+        default: 'dev'
+
+jobs:
+  build-installer:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+        continue-on-error: true  # Don't fail build if tests fail (integration tests need real services)
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install NSIS
+        run: |
+          # Download NSIS
+          Invoke-WebRequest -Uri "https://sourceforge.net/projects/nsis/files/NSIS%203/3.09/nsis-3.09-setup.exe/download" -OutFile "nsis-setup.exe"
+
+          # Install NSIS silently
+          Start-Process -FilePath "nsis-setup.exe" -ArgumentList "/S" -Wait
+
+          # Add NSIS to PATH
+          $env:Path += ";C:\Program Files (x86)\NSIS"
+
+          # Verify installation
+          makensis /VERSION
+        shell: pwsh
+
+      - name: Copy LICENSE file
+        run: npm run installer:copy-license
+        continue-on-error: true
+
+      - name: Build installer
+        run: |
+          cd installer
+          & "C:\Program Files (x86)\NSIS\makensis.exe" unifi-doordeck-bridge.nsi
+        shell: pwsh
+
+      - name: Get version and find installer
+        id: package-version
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+          # NSIS already creates the file with version in the name
+          $installerPath = "installer\UniFi-Doordeck-Bridge-Setup-$version.exe"
+
+          if (Test-Path $installerPath) {
+            # Move to root for artifact upload
+            Move-Item -Path $installerPath -Destination "."
+            echo "INSTALLER_NAME=UniFi-Doordeck-Bridge-Setup-$version.exe" >> $env:GITHUB_OUTPUT
+            echo "INSTALLER_PATH=UniFi-Doordeck-Bridge-Setup-$version.exe" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Error "Installer not found at: $installerPath"
+            exit 1
+          }
+        shell: pwsh
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: UniFi-Doordeck-Bridge-Setup-*.exe
+          retention-days: 90
+
+      - name: Upload to release (if release event)
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: UniFi-Doordeck-Bridge-Setup-*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release summary
+        run: |
+          echo "## Windows Installer Built Successfully" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.package-version.outputs.VERSION }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **File:** ${{ steps.package-version.outputs.INSTALLER_NAME }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **Platform:** Windows 10/11 (64-bit)" >> $env:GITHUB_STEP_SUMMARY
+          echo "- **Node.js:** v20 LTS" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "### Download" >> $env:GITHUB_STEP_SUMMARY
+          echo "The installer is available as a workflow artifact or in the release assets." >> $env:GITHUB_STEP_SUMMARY
+        shell: pwsh

@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+release/
+*.exe
+*.msi
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Electron
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Config (don't commit user configs)
+config.json
+
+# Coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
