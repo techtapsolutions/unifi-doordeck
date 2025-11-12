@@ -27,7 +27,7 @@ function createMainWindow(): BrowserWindow {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,  // Disabled for desktop app - allows normal require() in preload
     },
     show: false, // Don't show until ready
   });
