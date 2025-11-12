@@ -1,11 +1,29 @@
 /**
  * Connection Testers for Setup Wizard
  * Tests UniFi and Doordeck connections without requiring the bridge service
+ * Also provides door discovery functionality for setup wizard
  */
 
 import https from 'https';
 import { readFileSync } from 'fs';
-import type { UniFiConfig, DoordeckConfig } from '../shared/types';
+import type { UniFiConfig, DoordeckConfig, Door } from '../shared/types';
+
+interface UniFiDevice {
+  unique_id: string;
+  name: string;
+  device_type: string;
+  door?: {
+    unique_id: string;
+    name: string;
+    full_name: string;
+    floor_id?: string;
+  };
+  location?: {
+    unique_id: string;
+    name: string;
+    full_name: string;
+  };
+}
 
 /**
  * Test UniFi Access controller connection
@@ -65,7 +83,7 @@ async function testUniFiWithAPIKey(config: UniFiConfig): Promise<{ success: bool
     const options: https.RequestOptions = {
       hostname: config.host,
       port,
-      path: '/proxy/access/api/v2/device',
+      path: '/proxy/access/api/v2/devices',
       method: 'GET',
       headers: {
         'X-API-KEY': config.apiKey!,
@@ -329,6 +347,162 @@ export async function testDoordeckConnection(config: DoordeckConfig): Promise<{ 
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Connection test failed',
+    };
+  }
+}
+
+/**
+ * Discover doors from UniFi Access controller
+ */
+export async function discoverUniFiDoors(config: UniFiConfig): Promise<{ success: boolean; doors?: Door[]; error?: string }> {
+  try {
+    // Validate required fields
+    if (!config.host) {
+      return { success: false, error: 'Host is required' };
+    }
+
+    if (!config.apiKey) {
+      return { success: false, error: 'API key is required for door discovery' };
+    }
+
+    return new Promise((resolve) => {
+      // Create HTTPS agent
+      const agentOptions: https.AgentOptions = {
+        rejectUnauthorized: !config.skipSSLVerification,
+      };
+
+      // Load custom CA certificate if provided
+      if (config.caCertPath && !config.skipSSLVerification) {
+        try {
+          const ca = readFileSync(config.caCertPath);
+          agentOptions.ca = ca;
+        } catch (error) {
+          resolve({
+            success: false,
+            error: `Failed to load CA certificate: ${error instanceof Error ? error.message : String(error)}`,
+          });
+          return;
+        }
+      }
+
+      const agent = new https.Agent(agentOptions);
+      const port = config.port || 443;
+
+      // Fetch devices from UniFi Access API
+      const options: https.RequestOptions = {
+        hostname: config.host,
+        port,
+        path: '/proxy/access/api/v2/devices',
+        method: 'GET',
+        headers: {
+          'X-API-KEY': config.apiKey,
+          'Accept': 'application/json',
+        },
+        agent,
+        timeout: 15000, // 15 second timeout
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              const response = JSON.parse(data);
+              const devices: UniFiDevice[] = response.data || [];
+
+              // Extract doors from devices
+              const doors: Door[] = [];
+
+              for (const device of devices) {
+                // Check if device has a door property
+                if (device.door) {
+                  doors.push({
+                    id: device.door.unique_id,
+                    name: device.door.full_name || device.door.name,
+                    floor: device.door.floor_id,
+                    metadata: {
+                      device_id: device.unique_id,
+                      device_name: device.name,
+                      device_type: device.device_type,
+                    },
+                  });
+                }
+                // Also check location property for door locations
+                else if (device.location && device.device_type === 'UA_Door') {
+                  doors.push({
+                    id: device.location.unique_id,
+                    name: device.location.full_name || device.location.name,
+                    metadata: {
+                      device_id: device.unique_id,
+                      device_name: device.name,
+                      device_type: device.device_type,
+                    },
+                  });
+                }
+              }
+
+              resolve({
+                success: true,
+                doors,
+              });
+            } catch (error) {
+              resolve({
+                success: false,
+                error: `Failed to parse devices: ${error instanceof Error ? error.message : String(error)}`,
+              });
+            }
+          } else if (res.statusCode === 401 || res.statusCode === 403) {
+            resolve({
+              success: false,
+              error: 'Authentication failed. Please check your API key.',
+            });
+          } else {
+            resolve({
+              success: false,
+              error: `HTTP ${res.statusCode}: ${data}`,
+            });
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        if (error.message.includes('ECONNREFUSED')) {
+          resolve({
+            success: false,
+            error: `Cannot connect to ${config.host}:${port}. Please check the host and port.`,
+          });
+        } else if (error.message.includes('ETIMEDOUT')) {
+          resolve({
+            success: false,
+            error: 'Connection timed out. Please check your network connection.',
+          });
+        } else {
+          resolve({
+            success: false,
+            error: error.message,
+          });
+        }
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({
+          success: false,
+          error: 'Connection timed out after 15 seconds.',
+        });
+      });
+
+      req.end();
+    });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Door discovery failed',
     };
   }
 }

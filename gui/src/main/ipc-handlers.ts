@@ -18,7 +18,7 @@ import type {
 import { IPCChannel } from '../shared/types';
 import { BridgeServiceClient } from './bridge-client';
 import { ConfigManager } from './config-manager';
-import { testUniFiConnection, testDoordeckConnection } from './connection-testers';
+import { testUniFiConnection, testDoordeckConnection, discoverUniFiDoors } from './connection-testers';
 
 let bridgeClient: BridgeServiceClient;
 let configManager: ConfigManager;
@@ -188,8 +188,33 @@ async function handleDoorsList(): Promise<APIResponse<Door[]>> {
 
 async function handleDoorsDiscover(): Promise<APIResponse<Door[]>> {
   try {
-    const doors = await bridgeClient.discoverDoors();
-    return { success: true, data: doors };
+    // During setup wizard, use standalone door discovery
+    // After setup, use bridge service
+    const config = await configManager.getConfig();
+
+    if (config && config.unifi && config.unifi.host && config.unifi.apiKey) {
+      // Use standalone door discovery
+      const result = await discoverUniFiDoors(config.unifi);
+      if (result.success && result.doors) {
+        return { success: true, data: result.doors };
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Failed to discover doors',
+        };
+      }
+    } else {
+      // Try bridge service (for when setup is complete and service is running)
+      try {
+        const doors = await bridgeClient.discoverDoors();
+        return { success: true, data: doors };
+      } catch (error) {
+        return {
+          success: false,
+          error: 'Please configure UniFi settings with API key first',
+        };
+      }
+    }
   } catch (error) {
     return {
       success: false,
