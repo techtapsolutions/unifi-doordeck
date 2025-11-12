@@ -21,6 +21,7 @@ export default function UniFiStep({ initialConfig, onNext, onBack }: UniFiStepPr
   const [username, setUsername] = useState(initialConfig?.username || '');
   const [password, setPassword] = useState(initialConfig?.password || '');
   const [caCertPath, setCaCertPath] = useState(initialConfig?.caCertPath || '');
+  const [skipSSLVerification, setSkipSSLVerification] = useState(initialConfig?.skipSSLVerification || false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(
     null
@@ -35,6 +36,7 @@ export default function UniFiStep({ initialConfig, onNext, onBack }: UniFiStepPr
       port: parseInt(port),
       ...(authMethod === 'apiKey' ? { apiKey } : { username, password }),
       ...(caCertPath && { caCertPath }),
+      ...(skipSSLVerification && { skipSSLVerification }),
     };
 
     try {
@@ -63,6 +65,7 @@ export default function UniFiStep({ initialConfig, onNext, onBack }: UniFiStepPr
       port: parseInt(port),
       ...(authMethod === 'apiKey' ? { apiKey } : { username, password }),
       ...(caCertPath && { caCertPath }),
+      ...(skipSSLVerification && { skipSSLVerification }),
     };
     onNext(config);
   }
@@ -176,9 +179,24 @@ export default function UniFiStep({ initialConfig, onNext, onBack }: UniFiStepPr
           onChange={(e) => setCaCertPath(e.target.value)}
           placeholder="C:\path\to\ca-cert.pem"
           className="form-control"
+          disabled={skipSSLVerification}
         />
         <small>
-          Required only if using self-signed certificates. SSL verification is always enabled.
+          Path to CA certificate file for self-signed certificates.
+        </small>
+      </div>
+
+      <div className="form-group">
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={skipSSLVerification}
+            onChange={(e) => setSkipSSLVerification(e.target.checked)}
+          />
+          <span>Skip SSL Certificate Verification</span>
+        </label>
+        <small className="warning-text">
+          ⚠️ Not recommended for production. Use only for testing with self-signed certificates.
         </small>
       </div>
 

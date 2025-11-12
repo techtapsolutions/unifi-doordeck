@@ -41,11 +41,11 @@ async function testUniFiWithAPIKey(config: UniFiConfig): Promise<{ success: bool
   return new Promise((resolve) => {
     // Create HTTPS agent
     const agentOptions: https.AgentOptions = {
-      rejectUnauthorized: true,
+      rejectUnauthorized: !config.skipSSLVerification, // Skip verification if requested
     };
 
-    // Load custom CA certificate if provided
-    if (config.caCertPath) {
+    // Load custom CA certificate if provided (ignored if skipSSLVerification is true)
+    if (config.caCertPath && !config.skipSSLVerification) {
       try {
         const ca = readFileSync(config.caCertPath);
         agentOptions.ca = ca;
@@ -142,11 +142,11 @@ async function testUniFiWithPassword(config: UniFiConfig): Promise<{ success: bo
   return new Promise((resolve) => {
     // Create HTTPS agent
     const agentOptions: https.AgentOptions = {
-      rejectUnauthorized: true,
+      rejectUnauthorized: !config.skipSSLVerification, // Skip verification if requested
     };
 
-    // Load custom CA certificate if provided
-    if (config.caCertPath) {
+    // Load custom CA certificate if provided (ignored if skipSSLVerification is true)
+    if (config.caCertPath && !config.skipSSLVerification) {
       try {
         const ca = readFileSync(config.caCertPath);
         agentOptions.ca = ca;

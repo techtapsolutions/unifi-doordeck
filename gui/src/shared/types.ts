@@ -13,6 +13,7 @@ export interface UniFiConfig {
   username?: string;
   password?: string;
   caCertPath?: string;
+  skipSSLVerification?: boolean; // Skip SSL certificate verification (not recommended for production)
   reconnectDelay?: number;
   maxRetries?: number;
 }
