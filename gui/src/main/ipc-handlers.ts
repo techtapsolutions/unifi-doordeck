@@ -18,6 +18,7 @@ import type {
 import { IPCChannel } from '../shared/types';
 import { BridgeServiceClient } from './bridge-client';
 import { ConfigManager } from './config-manager';
+import { testUniFiConnection, testDoordeckConnection } from './connection-testers';
 
 let bridgeClient: BridgeServiceClient;
 let configManager: ConfigManager;
@@ -268,8 +269,16 @@ async function handleTestUniFi(
   config: UniFiConfig
 ): Promise<APIResponse<boolean>> {
   try {
-    const result = await bridgeClient.testUniFiConnection(config);
-    return { success: true, data: result };
+    // Use standalone connection tester (doesn't require bridge service to be running)
+    const result = await testUniFiConnection(config);
+    if (result.success) {
+      return { success: true, data: true };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Connection test failed',
+      };
+    }
   } catch (error) {
     return {
       success: false,
@@ -283,8 +292,16 @@ async function handleTestDoordeck(
   config: DoordeckConfig
 ): Promise<APIResponse<boolean>> {
   try {
-    const result = await bridgeClient.testDoordeckConnection(config);
-    return { success: true, data: result };
+    // Use standalone connection tester (doesn't require bridge service to be running)
+    const result = await testDoordeckConnection(config);
+    if (result.success) {
+      return { success: true, data: true };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Connection test failed',
+      };
+    }
   } catch (error) {
     return {
       success: false,
