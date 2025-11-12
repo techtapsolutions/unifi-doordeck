@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import SetupWizard from './components/SetupWizard';
 import Dashboard from './components/Dashboard';
 import type { BridgeConfig } from '../shared/types';
@@ -53,7 +53,7 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         {!isConfigured ? (
           <>
@@ -67,7 +67,7 @@ function App() {
           </>
         )}
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
