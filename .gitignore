@@ -10,6 +10,7 @@ build/
 *.js.map
 *.d.ts
 !jest.config.js
+!gui/scripts/*.js
 
 # GUI build output
 gui/dist/
