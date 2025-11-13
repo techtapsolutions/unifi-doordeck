@@ -41,16 +41,63 @@ jobs:
             Get-ChildItem -Path . | Format-Table Name
           }
 
-      - name: Create Release
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create ${{ github.ref_name }} \
-            --title "UniFi-Doordeck Bridge ${{ github.ref_name }}" \
-            --notes "Automated release for version ${{ github.ref_name }}" \
-            gui/release/*.exe \
-            gui/release/*.blockmap \
-            gui/release/latest.yml
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: UniFi-Doordeck Bridge ${{ github.ref_name }}
+          body: |
+            Automated release for version ${{ github.ref_name }}
+
+            ## Changes
+            - Fixed update checking infinite loop
+            - Added close button to update error notifications
+            - Configured automated releases via GitHub Actions
+          draft: false
+          prerelease: false
+
+      - name: Upload Setup Installer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: gui/release/UniFi-Doordeck Bridge-Setup-0.1.1.exe
+          asset_name: UniFi-Doordeck-Bridge-Setup-0.1.1.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload Portable Version
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: gui/release/UniFi-Doordeck Bridge-Portable-0.1.1.exe
+          asset_name: UniFi-Doordeck-Bridge-Portable-0.1.1.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload Blockmap
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: gui/release/UniFi-Doordeck Bridge-Setup-0.1.1.exe.blockmap
+          asset_name: UniFi-Doordeck-Bridge-Setup-0.1.1.exe.blockmap
+          asset_content_type: application/octet-stream
+
+      - name: Upload Latest YAML
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: gui/release/latest.yml
+          asset_name: latest.yml
+          asset_content_type: text/yaml
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
