@@ -48,9 +48,9 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           artifacts: |
-            gui/release/UniFi-Doordeck Bridge-Setup-*.exe
-            gui/release/UniFi-Doordeck Bridge-Portable-*.exe
-            gui/release/UniFi-Doordeck Bridge-Setup-*.exe.blockmap
+            gui/release/UniFi-Doordeck-Bridge-Setup-*.exe
+            gui/release/UniFi-Doordeck-Bridge-Portable-*.exe
+            gui/release/UniFi-Doordeck-Bridge-Setup-*.exe.blockmap
             gui/release/latest.yml
           name: UniFi-Doordeck Bridge ${{ github.ref_name }}
           body: |
