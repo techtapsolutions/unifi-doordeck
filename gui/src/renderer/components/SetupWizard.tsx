@@ -8,7 +8,7 @@ import type { SetupStep, BridgeConfig, Door, DoorMapping } from '../../shared/ty
 import WelcomeStep from './setup-steps/WelcomeStep';
 import UniFiStep from './setup-steps/UniFiStep';
 import DoordeckStep from './setup-steps/DoordeckStep';
-import DoorsStep from './setup-steps/DoorsStep';
+import DoorMappingStep from './setup-steps/DoorMappingStep';
 import CompleteStep from './setup-steps/CompleteStep';
 
 interface SetupWizardProps {
@@ -23,13 +23,14 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
     logging: { level: 'info' },
     security: { apiAuthEnabled: true, logSanitization: true },
     server: { port: 3000, enabled: true },
+    webhook: { enabled: true, verifySignature: true, port: 34512 },
   });
   const [unifiTested, setUnifiTested] = useState(false);
   const [doordeckTested, setDoordeckTested] = useState(false);
   const [discoveredDoors, setDiscoveredDoors] = useState<Door[]>([]);
   const [mappedDoors, setMappedDoors] = useState<DoorMapping[]>([]);
 
-  const steps: SetupStep[] = ['welcome', 'unifi', 'doordeck', 'doors', 'complete'];
+  const steps: SetupStep[] = ['welcome', 'unifi', 'doordeck', 'mapping', 'complete'];
   const currentStepIndex = steps.indexOf(currentStep);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
 
@@ -41,7 +42,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
       } else if (currentStep === 'doordeck') {
         setConfig({ ...config, doordeck: stepData });
         setDoordeckTested(true);
-      } else if (currentStep === 'doors') {
+      } else if (currentStep === 'mapping') {
         setMappedDoors(stepData);
       }
     }
@@ -62,14 +63,37 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
   async function handleComplete() {
     try {
       // Save configuration
-      const response = await window.bridge.completeSetup(config as BridgeConfig);
-      if (response.success) {
-        onComplete();
-      } else {
-        alert(`Setup failed: ${response.error}`);
+      console.log('[Setup] Saving configuration...');
+      const saveResponse = await window.bridge.completeSetup(config as BridgeConfig);
+      if (!saveResponse.success) {
+        alert(`Failed to save configuration: ${saveResponse.error}`);
+        return;
       }
+      console.log('[Setup] Configuration saved');
+
+      // Install service
+      console.log('[Setup] Installing service...');
+      const installResponse = await window.bridge.installService();
+      if (!installResponse.success) {
+        alert(`Failed to install service: ${installResponse.error}\n\nNote: Installing a Windows service requires administrator privileges. Please run the application as administrator.`);
+        return;
+      }
+      console.log('[Setup] Service installed');
+
+      // Start service
+      console.log('[Setup] Starting service...');
+      const startResponse = await window.bridge.startService();
+      if (!startResponse.success) {
+        alert(`Service installed but failed to start: ${startResponse.error}\n\nYou can try starting it manually from the Dashboard.`);
+        // Still complete setup even if start fails
+      }
+      console.log('[Setup] Service started');
+
+      // Complete setup
+      onComplete();
     } catch (error) {
-      alert(`Setup failed: ${error}`);
+      console.error('[Setup] Error:', error);
+      alert(`Setup failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -106,12 +130,12 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           />
         )}
 
-        {currentStep === 'doors' && (
-          <DoorsStep
+        {currentStep === 'mapping' && (
+          <DoorMappingStep
             unifiConfig={config.unifi!}
+            doordeckConfig={config.doordeck!}
             onNext={handleNext}
             onBack={handleBack}
-            onDoorsDiscovered={setDiscoveredDoors}
           />
         )}
 

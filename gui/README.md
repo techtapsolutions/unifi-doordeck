@@ -19,6 +19,16 @@ Native Windows desktop application for configuring and monitoring the UniFi-Door
 - **Door Management**: View and control all mapped doors
 - **Quick Unlock**: One-click door unlock from the dashboard
 - **System Tray**: Minimize to tray for background operation
+- **Real-time Logs**: View, filter, search, and export service logs
+- **Door Mappings**: Manage UniFi-to-Doordeck door mappings
+
+### Auto-Update System
+- **Automatic Update Checks**: Checks for updates on startup
+- **Background Downloads**: Updates download without interrupting work
+- **Release Notes**: View what's new in each version
+- **User Control**: Choose when to install updates
+- **Delta Updates**: Only downloads changes, not full installer
+- **Code Signature Verification**: Ensures updates are authentic
 
 ### Security
 - **Windows Credential Manager**: Secure credential storage
@@ -261,6 +271,14 @@ npm run package:win
 
 ⚡ **[Quick Reference](BUILD_QUICK_REFERENCE.md)** - One-page cheat sheet
 
+🔄 **[Auto-Update System](AUTO_UPDATE.md)** - Update management guide:
+- How auto-updates work
+- Publishing updates to GitHub/S3
+- Testing update flow
+- Release process
+- Delta updates
+- Troubleshooting updates
+
 ### What Gets Created
 
 ```bash
@@ -290,26 +308,193 @@ Output location: `release/`
 
 ### Before Building for Production
 
-⚠️ **Replace Placeholder Icons**
+⚠️ **Important Production Steps**
 
-The default `npm run make-icons` creates basic placeholders. For production:
+#### 1. Professional Icons
 
-1. Create professional icons using:
-   - Adobe Illustrator / Photoshop
-   - Figma (free)
-   - Inkscape (free)
+The application includes professional icons by default. To regenerate:
 
-2. Required files in `assets/`:
-   - `icon.ico` - Main app icon (16, 32, 48, 256px)
-   - `installer-header.bmp` - Installer header (150x57)
-   - `installer-sidebar.bmp` - Installer sidebar (164x314)
-   - `tray-icon.png` - System tray icon (16x16)
+```bash
+npm run make-icons
+```
 
-3. Icon conversion tools:
-   - https://convertio.co/png-ico/
-   - https://icoconvert.com/
+Generated files:
+- `icon.svg` (512x512) - Main application icon with two-door bridge design
+- `icon-256.svg` (256x256) - Medium size variant
+- `icon-512.svg` (512x512) - Large size variant
+- `tray-icon.svg` (32x32) - System tray icon
+- `icon.ico` - Windows icon
+- `installer-*.bmp` - Installer graphics
 
-See **[BUILD_INSTALLER.md](BUILD_INSTALLER.md#icon-requirements)** for detailed icon guidelines.
+#### 2. Code Signing (Highly Recommended)
+
+Code signing prevents "Unknown Publisher" warnings and builds user trust.
+
+**Quick Setup**:
+
+1. Copy environment template:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Add your certificate details to `.env`:
+   ```
+   WIN_CSC_LINK=path/to/certificate.pfx
+   WIN_CSC_KEY_PASSWORD=your-certificate-password
+   ```
+
+3. Build with signing:
+   ```bash
+   npm run package:win
+   ```
+
+**Without Certificate** (Development Only):
+```bash
+npm run package:win
+# Will show warnings but build succeeds
+```
+
+📖 **[Complete Code Signing Guide](CODE_SIGNING.md)** - Detailed documentation:
+- How to obtain certificates (DigiCert, Sectigo, GlobalSign, SSL.com)
+- Cost comparison ($199-$629/year)
+- Self-signed certificates for testing
+- CI/CD integration (GitHub Actions, Azure Pipelines)
+- Troubleshooting and best practices
+- SmartScreen reputation building
+
+**Certificate Providers**:
+- **DigiCert**: $474/year (Standard), $629/year (EV)
+- **Sectigo**: $200/year (Standard), $350/year (EV) - Cost-effective
+- **GlobalSign**: $249/year (Standard), $599/year (EV)
+- **SSL.com**: $199/year (Standard), $399/year (EV) - Budget-friendly
+
+**Recommendation**: Start with Sectigo Standard ($200/year), upgrade to EV if SmartScreen warnings become an issue.
+
+## Releasing Updates
+
+The application includes an automated update system that allows you to push updates to users without requiring them to download new installers.
+
+### How Auto-Updates Work
+
+1. Users install the application (v0.1.0)
+2. You publish a new version (v0.1.1) to GitHub Releases
+3. On next launch, users automatically see "Update Available" notification
+4. They click "Download Update" → installs → restarts with new version
+5. No manual installer distribution needed!
+
+### Publishing a New Version (Automated)
+
+**Simple 3-Step Process**:
+
+```bash
+cd gui
+
+# 1. Update version in package.json
+# Edit "version": "0.1.2"
+
+# 2. Commit and push changes
+git add package.json
+git commit -m "Release v0.1.2"
+git push origin main
+
+# 3. Create and push tag
+git tag v0.1.2
+git push origin v0.1.2
+```
+
+**GitHub Actions automatically**:
+- Builds the Windows installer
+- Creates a GitHub Release
+- Uploads installer + update files (blockmap, latest.yml)
+- Users receive update notifications within 24 hours
+
+### What Users Experience
+
+**When Update is Available**:
+1. User opens app (or it's already running)
+2. Banner appears: "Checking for updates..."
+3. After check: "Version 0.1.2 is available" with release notes
+4. User clicks "Download Update"
+5. Progress bar shows download (fast with delta updates)
+6. Dialog: "Update Ready to Install - Restart Now / Later"
+7. User clicks "Restart Now"
+8. App closes → installs update → reopens with new version
+
+### Update Files
+
+GitHub Actions automatically generates and uploads:
+- **Installer** (`UniFi-Doordeck Bridge-Setup-0.1.2.exe`) - Full installer
+- **Block Map** (`.exe.blockmap`) - Enables delta updates (only download changes)
+- **Metadata** (`latest.yml`) - Version info and checksums
+
+### Current Configuration (Without Code Signing)
+
+**What Works**:
+- ✅ Automatic update notifications
+- ✅ One-click download and install
+- ✅ Delta updates (only downloads changes, not full 79MB)
+- ✅ Release notes display
+
+**Known Limitation**:
+- ⚠️ Windows SmartScreen shows warning on first run after update
+- ⚠️ Users must click "More info" → "Run anyway" (one-time per update)
+- ⚠️ Shows "Unknown Publisher"
+
+**To Remove Warnings** (When Budget Allows):
+1. Purchase code signing certificate ($200-400/year)
+2. Add certificate to GitHub Secrets
+3. Update `verifyUpdateCodeSignature: true` in package.json
+4. Rebuild → no more security warnings!
+
+### Monitoring Updates
+
+**Check Update Status**:
+- Go to: https://github.com/techtapsolutions/unifi-doordeck/releases
+- View all published versions
+- See download statistics
+- Monitor adoption rate
+
+**GitHub Actions**:
+- Go to: https://github.com/techtapsolutions/unifi-doordeck/actions
+- View build logs
+- Troubleshoot build issues
+- Verify successful releases
+
+### Release Best Practices
+
+**Version Numbering** (Semantic Versioning):
+- **Major** (1.0.0): Breaking changes
+- **Minor** (0.1.0): New features, backward compatible
+- **Patch** (0.0.1): Bug fixes only
+
+**Release Notes**:
+GitHub Actions automatically extracts release notes from:
+- Git commit messages between versions
+- Add notes manually in GitHub Release UI for better user experience
+
+**Testing Before Release**:
+1. Build and test locally first
+2. Verify all features work
+3. Test update process from previous version
+4. Only then push tag to trigger automated release
+
+### Troubleshooting Updates
+
+**Update Check Fails**:
+- Verify GitHub repository is public (or user has access if private)
+- Check internet connectivity
+- Review error in app logs
+
+**Update Download Fails**:
+- Check GitHub Releases has all 3 required files
+- Verify file permissions/access
+- Check firewall settings
+
+**Build Fails in GitHub Actions**:
+- Review build logs in GitHub Actions tab
+- Verify package.json syntax is valid
+- Check all dependencies are in package.json
+- Ensure tag format is correct (v0.1.1, not 0.1.1)
 
 ## Development Tips
 

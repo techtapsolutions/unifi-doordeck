@@ -32,6 +32,15 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Code signing certificates (NEVER commit these!)
+*.pfx
+*.p12
+*.cer
+*.crt
+*.key
+certificate.pfx
+code-signing-cert.pfx
+
 # Generated icons (keep source assets)
 assets/icon-*.svg
 

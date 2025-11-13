@@ -9,10 +9,14 @@ import type {
   ConfigValidationResult,
   Door,
   DoorMapping,
+  DoordeckLock,
   LogEntry,
   ServiceHealth,
   UniFiConfig,
   DoordeckConfig,
+  UpdateStatus,
+  UpdateAvailableInfo,
+  UpdateDownloadedInfo,
 } from './types';
 
 /**
@@ -25,6 +29,8 @@ export interface BridgeAPI {
   validateConfig: (config: Partial<BridgeConfig>) => Promise<APIResponse<ConfigValidationResult>>;
 
   // Service control
+  installService: () => Promise<APIResponse<void>>;
+  uninstallService: () => Promise<APIResponse<void>>;
   startService: () => Promise<APIResponse<void>>;
   stopService: () => Promise<APIResponse<void>>;
   restartService: () => Promise<APIResponse<void>>;
@@ -35,8 +41,20 @@ export interface BridgeAPI {
   listDoors: () => Promise<APIResponse<Door[]>>;
   discoverDoors: () => Promise<APIResponse<Door[]>>;
   unlockDoor: (doorId: string) => Promise<APIResponse<void>>;
-  mapDoor: (mapping: DoorMapping) => Promise<APIResponse<void>>;
-  unmapDoor: (unifiDoorId: string) => Promise<APIResponse<void>>;
+
+  // Door Mappings
+  listMappings: () => Promise<APIResponse<DoorMapping[]>>;
+  getMapping: (id: string) => Promise<APIResponse<DoorMapping>>;
+  createMapping: (data: {
+    unifiDoorId: string;
+    unifiDoorName: string;
+    doordeckLockId: string;
+    doordeckLockName: string;
+    siteId?: string;
+  }) => Promise<APIResponse<DoorMapping>>;
+  updateMapping: (id: string, updates: Partial<Omit<DoorMapping, 'id' | 'createdAt'>>) => Promise<APIResponse<DoorMapping>>;
+  deleteMapping: (id: string) => Promise<APIResponse<void>>;
+  listDoordeckLocks: () => Promise<APIResponse<DoordeckLock[]>>;
 
   // Logs
   getLogs: (limit?: number) => Promise<APIResponse<LogEntry[]>>;
@@ -53,6 +71,17 @@ export interface BridgeAPI {
   testDoordeckConnection: (config: DoordeckConfig) => Promise<APIResponse<boolean>>;
   discoverDoorsWithConfig: (config: UniFiConfig) => Promise<APIResponse<Door[]>>;
   completeSetup: (config: BridgeConfig) => Promise<APIResponse<void>>;
+
+  // Auto-update
+  checkForUpdates: () => Promise<APIResponse<UpdateStatus>>;
+  downloadUpdate: () => Promise<APIResponse<void>>;
+  installUpdate: () => Promise<APIResponse<void>>;
+  getUpdateStatus: () => Promise<APIResponse<UpdateStatus>>;
+
+  // Update event subscriptions
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
+  onUpdateAvailable: (callback: (info: UpdateAvailableInfo) => void) => () => void;
+  onUpdateDownloaded: (callback: (info: UpdateDownloadedInfo) => void) => () => void;
 }
 
 /**

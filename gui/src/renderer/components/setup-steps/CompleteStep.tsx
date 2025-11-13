@@ -86,6 +86,43 @@ export default function CompleteStep({
         </div>
 
         <div className="summary-section">
+          <h3>Webhooks</h3>
+          <div className="summary-item">
+            <span className="label">Status:</span>
+            <span className="value">
+              {config.webhook?.enabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          {config.webhook?.enabled && (
+            <>
+              {config.webhook?.publicHost ? (
+                <div className="summary-item">
+                  <span className="label">Webhook URL:</span>
+                  <span className="value" style={{ fontSize: '11px', wordBreak: 'break-all' }}>
+                    http://{config.webhook.publicHost}:{config.webhook?.port || 34512}/webhook/doordeck
+                  </span>
+                </div>
+              ) : (
+                <p className="help-text" style={{ color: '#f59e0b', marginTop: '8px' }}>
+                  ⚠️ No public host configured. Add your public IP or domain in Settings &gt; Advanced &gt; Webhooks.
+                </p>
+              )}
+              <div className="summary-item">
+                <span className="label">Signature Verification:</span>
+                <span className="value">
+                  {config.webhook?.verifySignature ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              {!config.webhook?.secret && (
+                <p className="help-text" style={{ color: '#f59e0b', marginTop: '8px' }}>
+                  ⚠️ No webhook secret configured. Get it from Doordeck dashboard and add in Settings &gt; Advanced.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="summary-section">
           <h3>Security</h3>
           <div className="summary-item">
             <span className="label">Credential Storage:</span>
@@ -108,10 +145,25 @@ export default function CompleteStep({
         <h3>What happens next?</h3>
         <ol>
           <li>Configuration will be saved securely</li>
-          <li>Bridge service will start automatically</li>
+          <li>Bridge service will start automatically on port 34512</li>
           <li>Doors will be registered with Doordeck Cloud</li>
+          {config.webhook?.enabled && (
+            <li>Webhook endpoint will be ready to receive events from Doordeck</li>
+          )}
           <li>You'll be taken to the dashboard to monitor status</li>
         </ol>
+        {config.webhook?.enabled && (
+          <div className="help-text" style={{ marginTop: '12px', padding: '12px', backgroundColor: '#eff6ff', borderRadius: '4px', borderLeft: '3px solid #3b82f6' }}>
+            <strong>📋 To complete webhook setup:</strong>
+            <ol style={{ marginTop: '8px', marginBottom: '0', paddingLeft: '20px' }}>
+              <li>Go to Settings &gt; Advanced &gt; Webhooks and enter your public IP or domain</li>
+              <li>Copy the generated webhook URL</li>
+              <li>In Doordeck dashboard, create a webhook with that URL</li>
+              <li>Copy the secret that Doordeck provides to you</li>
+              <li>Paste it back into Settings &gt; Advanced &gt; Webhooks</li>
+            </ol>
+          </div>
+        )}
       </div>
 
       <div className="step-actions">

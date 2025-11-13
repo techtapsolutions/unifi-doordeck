@@ -11,6 +11,11 @@ build/
 *.d.ts
 !jest.config.js
 
+# GUI build output
+gui/dist/
+gui/dist-renderer/
+gui/release/
+
 # Logs
 logs/
 *.log

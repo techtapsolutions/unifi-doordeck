@@ -13,8 +13,9 @@ import type {
   UniFiConfig,
   DoordeckConfig,
 } from '../shared/types';
+import * as serviceControl from './service-control';
 
-const DEFAULT_API_URL = 'http://localhost:3000';
+const DEFAULT_API_URL = 'http://localhost:34512';
 
 export class BridgeServiceClient {
   private apiUrl: string;
@@ -86,17 +87,42 @@ export class BridgeServiceClient {
    * Service control
    */
   async startService(): Promise<void> {
-    // Service is expected to be running or started manually
-    // This could be extended to use Windows Service API
-    throw new Error('Service control not yet implemented');
+    const result = await serviceControl.startService();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to start service');
+    }
   }
 
   async stopService(): Promise<void> {
-    throw new Error('Service control not yet implemented');
+    const result = await serviceControl.stopService();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to stop service');
+    }
   }
 
   async restartService(): Promise<void> {
-    throw new Error('Service control not yet implemented');
+    const result = await serviceControl.restartService();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to restart service');
+    }
+  }
+
+  async installService(): Promise<void> {
+    const result = await serviceControl.installService();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to install service');
+    }
+  }
+
+  async uninstallService(): Promise<void> {
+    const result = await serviceControl.uninstallService();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to uninstall service');
+    }
+  }
+
+  async isServiceInstalled(): Promise<boolean> {
+    return serviceControl.isServiceInstalled();
   }
 
   async getServiceStatus(): Promise<string> {
@@ -109,41 +135,41 @@ export class BridgeServiceClient {
   }
 
   async getServiceHealth(): Promise<ServiceHealth> {
-    return this.request<ServiceHealth>('GET', '/api/health');
+    return this.request<ServiceHealth>('GET', '/health');
   }
 
   /**
    * Door operations
    */
   async listDoors(): Promise<Door[]> {
-    return this.request<Door[]>('GET', '/api/doors');
+    return this.request<Door[]>('GET', '/doors');
   }
 
   async discoverDoors(): Promise<Door[]> {
-    return this.request<Door[]>('POST', '/api/doors/discover');
+    return this.request<Door[]>('POST', '/doors/discover');
   }
 
   async unlockDoor(doorId: string): Promise<void> {
-    await this.request('POST', `/api/doors/${doorId}/unlock`);
+    await this.request('POST', `/doors/${doorId}/unlock`);
   }
 
   async mapDoor(mapping: DoorMapping): Promise<void> {
-    await this.request('POST', '/api/mappings', mapping);
+    await this.request('POST', '/mappings', mapping);
   }
 
   async unmapDoor(unifiDoorId: string): Promise<void> {
-    await this.request('DELETE', `/api/mappings/${unifiDoorId}`);
+    await this.request('DELETE', `/mappings/${unifiDoorId}`);
   }
 
   /**
    * Logs
    */
   async getLogs(limit: number = 100): Promise<LogEntry[]> {
-    return this.request<LogEntry[]>('GET', `/api/logs?limit=${limit}`);
+    return this.request<LogEntry[]>('GET', `/logs?limit=${limit}`);
   }
 
   async clearLogs(): Promise<void> {
-    await this.request('DELETE', '/api/logs');
+    await this.request('DELETE', '/logs');
   }
 
   /**

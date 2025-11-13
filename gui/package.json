@@ -1,6 +1,6 @@
 {
   "name": "unifi-doordeck-bridge-gui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Native Windows GUI for UniFi-Doordeck Bridge configuration and monitoring",
   "main": "dist/main/main.js",
   "scripts": {
@@ -36,12 +36,15 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "electron-updater": "^6.6.2",
+    "node-windows": "^1.0.0-beta.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.15",
+    "@types/node-windows": "^0.1.6",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
@@ -115,6 +118,14 @@
     },
     "portable": {
       "artifactName": "${productName}-Portable-${version}.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "techtapsolutions",
+        "repo": "unifi-doordeck",
+        "releaseType": "release"
+      }
+    ]
   }
 }

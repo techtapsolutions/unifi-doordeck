@@ -6,7 +6,19 @@
 
 import https from 'https';
 import { readFileSync } from 'fs';
-import type { UniFiConfig, DoordeckConfig, Door } from '../shared/types';
+import type { UniFiConfig, DoordeckConfig, Door, DoordeckLock } from '../shared/types';
+
+// Optional logger - works with or without Electron
+let log: (level: string, message: string, ...args: any[]) => void;
+try {
+  const logger = require('./logger');
+  log = logger.log;
+} catch {
+  // Fallback to console logging if Electron logger not available
+  log = (level: string, message: string, ...args: any[]) => {
+    console.log(`[${level}] ${message}`, ...args);
+  };
+}
 
 interface UniFiDevice {
   unique_id: string;
@@ -352,6 +364,150 @@ export async function testDoordeckConnection(config: DoordeckConfig): Promise<{ 
 }
 
 /**
+ * Unlock a door via UniFi Access controller
+ */
+export async function unlockUniFiDoor(config: UniFiConfig, doorId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    log('INFO', `[DoorUnlock] Starting door unlock for: ${doorId}`);
+    log('INFO', `[DoorUnlock] Config: host=${config.host}, port=${config.port || 443}, hasApiKey=${!!config.apiKey}, skipSSL=${config.skipSSLVerification}`);
+
+    // Validate required fields
+    if (!config.host) {
+      log('ERROR', '[DoorUnlock] No host provided');
+      return { success: false, error: 'Host is required' };
+    }
+
+    if (!config.apiKey) {
+      log('ERROR', '[DoorUnlock] No API key provided');
+      return { success: false, error: 'API key is required for door unlock' };
+    }
+
+    return new Promise((resolve) => {
+      // Create HTTPS agent
+      const agentOptions: https.AgentOptions = {
+        rejectUnauthorized: !config.skipSSLVerification,
+      };
+
+      // Load custom CA certificate if provided
+      if (config.caCertPath && !config.skipSSLVerification) {
+        try {
+          const ca = readFileSync(config.caCertPath);
+          agentOptions.ca = ca;
+        } catch (error) {
+          resolve({
+            success: false,
+            error: `Failed to load CA certificate: ${error instanceof Error ? error.message : String(error)}`,
+          });
+          return;
+        }
+      }
+
+      const agent = new https.Agent(agentOptions);
+      const port = config.port || 443;
+
+      // Use location endpoint (not device endpoint)
+      const apiUrl = `https://${config.host}:${port}/proxy/access/api/v2/location/${doorId}/unlock`;
+      log('INFO', `[DoorUnlock] Making API request to: ${apiUrl}`);
+
+      // Send unlock command to UniFi Access API
+      const options: https.RequestOptions = {
+        hostname: config.host,
+        port,
+        path: `/proxy/access/api/v2/location/${doorId}/unlock`,
+        method: 'PUT',
+        headers: {
+          'X-API-KEY': config.apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        agent,
+        timeout: 10000, // 10 second timeout
+      };
+
+      const req = https.request(options, (res) => {
+        log('INFO', `[DoorUnlock] Got response status: ${res.statusCode}`);
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          log('INFO', `[DoorUnlock] Response data: ${data}`);
+
+          if (res.statusCode === 200 || res.statusCode === 204) {
+            log('INFO', '[DoorUnlock] Door unlocked successfully');
+            resolve({ success: true });
+          } else if (res.statusCode === 401 || res.statusCode === 403) {
+            log('ERROR', '[DoorUnlock] Authentication failed');
+            log('ERROR', `[DoorUnlock] Response: ${data}`);
+            resolve({
+              success: false,
+              error: 'Authentication failed. Please check your API key.',
+            });
+          } else if (res.statusCode === 404) {
+            log('ERROR', '[DoorUnlock] Door not found');
+            log('ERROR', `[DoorUnlock] Response: ${data}`);
+            resolve({
+              success: false,
+              error: `Door not found (HTTP 404). Location ID: ${doorId}. Response: ${data}`,
+            });
+          } else {
+            log('ERROR', `[DoorUnlock] HTTP error: ${res.statusCode}`);
+            log('ERROR', `[DoorUnlock] Response: ${data}`);
+            resolve({
+              success: false,
+              error: `HTTP ${res.statusCode}: ${data}`,
+            });
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        log('ERROR', '[DoorUnlock] Request error', error);
+        if (error.message.includes('ECONNREFUSED')) {
+          resolve({
+            success: false,
+            error: `Cannot connect to ${config.host}:${port}. Please check the host and port.`,
+          });
+        } else if (error.message.includes('ETIMEDOUT')) {
+          resolve({
+            success: false,
+            error: 'Connection timed out. Please check your network connection.',
+          });
+        } else {
+          resolve({
+            success: false,
+            error: error.message,
+          });
+        }
+      });
+
+      req.on('timeout', () => {
+        log('ERROR', '[DoorUnlock] Request timed out');
+        req.destroy();
+        resolve({
+          success: false,
+          error: 'Connection timed out after 10 seconds.',
+        });
+      });
+
+      // Send empty JSON object as body (required by API)
+      const body = JSON.stringify({});
+      log('INFO', '[DoorUnlock] Sending request body:', body);
+      req.write(body);
+      req.end();
+    });
+  } catch (error) {
+    log('ERROR', '[DoorUnlock] Exception', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Door unlock failed',
+    };
+  }
+}
+
+/**
  * Discover doors from UniFi Access controller
  */
 export async function discoverUniFiDoors(config: UniFiConfig): Promise<{ success: boolean; doors?: Door[]; error?: string }> {
@@ -547,6 +703,172 @@ export async function discoverUniFiDoors(config: UniFiConfig): Promise<{ success
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Door discovery failed',
+    };
+  }
+}
+
+/**
+ * Get Doordeck auth token
+ */
+async function getDoordeckAuthToken(config: DoordeckConfig): Promise<string | null> {
+  return new Promise((resolve) => {
+    const loginData = JSON.stringify({
+      email: config.email,
+      password: config.password,
+    });
+
+    const options: https.RequestOptions = {
+      hostname: 'api.doordeck.com',
+      port: 443,
+      path: '/auth/token',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(loginData),
+      },
+      timeout: 10000,
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try {
+            const response = JSON.parse(data);
+            resolve(response.authToken || response.token || null);
+          } catch (error) {
+            console.error('[Doordeck] Failed to parse auth response:', error);
+            resolve(null);
+          }
+        } else {
+          console.error('[Doordeck] Auth failed:', res.statusCode, data);
+          resolve(null);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('[Doordeck] Auth request error:', error);
+      resolve(null);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(null);
+    });
+
+    req.write(loginData);
+    req.end();
+  });
+}
+
+/**
+ * Discover Doordeck locks
+ */
+export async function discoverDoordeckLocks(
+  config: DoordeckConfig
+): Promise<{ success: boolean; locks?: DoordeckLock[]; error?: string }> {
+  try {
+    console.log('[DoordeckDiscovery] Starting lock discovery...');
+
+    // Get auth token
+    const token = await getDoordeckAuthToken(config);
+    if (!token) {
+      return {
+        success: false,
+        error: 'Failed to authenticate with Doordeck. Please check your credentials.',
+      };
+    }
+
+    console.log('[DoordeckDiscovery] Got auth token, fetching locks...');
+
+    // Fetch locks
+    return new Promise((resolve) => {
+      const options: https.RequestOptions = {
+        hostname: 'api.doordeck.com',
+        port: 443,
+        path: '/device',
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+        timeout: 10000,
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              console.log('[DoordeckDiscovery] Response:', data);
+              const locks = JSON.parse(data);
+
+              // Transform Doordeck lock format to our format
+              const transformedLocks: DoordeckLock[] = locks.map((lock: any) => ({
+                id: lock.deviceId || lock.id,
+                name: lock.name || 'Unnamed Lock',
+                description: lock.description,
+                colour: lock.colour,
+                favourite: lock.favourite,
+                siteId: lock.siteId,
+              }));
+
+              console.log('[DoordeckDiscovery] Found', transformedLocks.length, 'locks');
+              resolve({
+                success: true,
+                locks: transformedLocks,
+              });
+            } catch (error) {
+              console.error('[DoordeckDiscovery] Failed to parse response:', error);
+              resolve({
+                success: false,
+                error: 'Failed to parse Doordeck response',
+              });
+            }
+          } else {
+            console.error('[DoordeckDiscovery] HTTP error:', res.statusCode, data);
+            resolve({
+              success: false,
+              error: `Failed to fetch locks: HTTP ${res.statusCode}`,
+            });
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        console.error('[DoordeckDiscovery] Request error:', error);
+        resolve({
+          success: false,
+          error: error.message || 'Failed to fetch Doordeck locks',
+        });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({
+          success: false,
+          error: 'Request timed out',
+        });
+      });
+
+      req.end();
+    });
+  } catch (error) {
+    console.error('[DoordeckDiscovery] Exception:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Lock discovery failed',
     };
   }
 }

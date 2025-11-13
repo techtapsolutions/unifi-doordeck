@@ -58,6 +58,17 @@ export interface ServerConfig {
 }
 
 /**
+ * Webhook configuration
+ */
+export interface WebhookConfig {
+  enabled?: boolean;
+  secret?: string;
+  publicHost?: string; // Public IP or domain name for webhook URL
+  port?: number; // Service port (default: 34512)
+  verifySignature?: boolean;
+}
+
+/**
  * Complete bridge configuration
  */
 export interface BridgeConfig {
@@ -66,6 +77,7 @@ export interface BridgeConfig {
   logging?: LoggingConfig;
   security?: SecurityConfig;
   server?: ServerConfig;
+  webhook?: WebhookConfig;
   siteId?: string;
 }
 
@@ -88,7 +100,7 @@ export interface ServiceHealth {
 }
 
 /**
- * Door information
+ * Door information (UniFi)
  */
 export interface Door {
   id: string;
@@ -100,13 +112,29 @@ export interface Door {
 }
 
 /**
- * Door mapping
+ * Doordeck lock information
+ */
+export interface DoordeckLock {
+  id: string;
+  name: string;
+  description?: string;
+  colour?: string;
+  favourite?: boolean;
+  siteId?: string;
+}
+
+/**
+ * Door mapping between UniFi and Doordeck
  */
 export interface DoorMapping {
-  unifiDoorId: string;
-  doordeckLockId: string;
-  name: string;
-  siteId: string;
+  id: string; // Unique mapping ID
+  unifiDoorId: string; // UniFi location/door ID
+  unifiDoorName: string; // Display name from UniFi
+  doordeckLockId: string; // Doordeck lock UUID
+  doordeckLockName: string; // Display name from Doordeck
+  siteId?: string; // UniFi site ID (for multi-site support)
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
 }
 
 /**
@@ -120,6 +148,42 @@ export interface LogEntry {
 }
 
 /**
+ * Update status information
+ */
+export interface UpdateStatus {
+  checking: boolean;
+  available: boolean;
+  downloading: boolean;
+  downloaded: boolean;
+  error: string | null;
+  version?: string;
+  releaseNotes?: string;
+  releaseDate?: string;
+  progress?: {
+    percent: number;
+    transferred: number;
+    total: number;
+    bytesPerSecond: number;
+  };
+}
+
+/**
+ * Update availability info
+ */
+export interface UpdateAvailableInfo {
+  version: string;
+  releaseNotes: string;
+  releaseDate?: string;
+}
+
+/**
+ * Update downloaded info
+ */
+export interface UpdateDownloadedInfo {
+  version: string;
+}
+
+/**
  * IPC Channel names for Electron IPC communication
  */
 export enum IPCChannel {
@@ -129,6 +193,8 @@ export enum IPCChannel {
   VALIDATE_CONFIG = 'config:validate',
 
   // Service control
+  SERVICE_INSTALL = 'service:install',
+  SERVICE_UNINSTALL = 'service:uninstall',
   SERVICE_START = 'service:start',
   SERVICE_STOP = 'service:stop',
   SERVICE_RESTART = 'service:restart',
@@ -139,8 +205,14 @@ export enum IPCChannel {
   DOORS_LIST = 'doors:list',
   DOORS_DISCOVER = 'doors:discover',
   DOOR_UNLOCK = 'door:unlock',
-  DOOR_MAP = 'door:map',
-  DOOR_UNMAP = 'door:unmap',
+
+  // Door Mappings
+  MAPPINGS_LIST = 'mappings:list',
+  MAPPINGS_GET = 'mappings:get',
+  MAPPINGS_CREATE = 'mappings:create',
+  MAPPINGS_UPDATE = 'mappings:update',
+  MAPPINGS_DELETE = 'mappings:delete',
+  DOORDECK_LOCKS_LIST = 'doordeck:locks:list',
 
   // Logs
   LOGS_GET = 'logs:get',
@@ -159,6 +231,17 @@ export enum IPCChannel {
   SETUP_TEST_DOORDECK = 'setup:test:doordeck',
   SETUP_DISCOVER_DOORS = 'setup:discover:doors',
   SETUP_COMPLETE = 'setup:complete',
+
+  // Auto-update
+  UPDATE_CHECK = 'update:check',
+  UPDATE_DOWNLOAD = 'update:download',
+  UPDATE_INSTALL = 'update:install',
+  UPDATE_GET_STATUS = 'update:get-status',
+
+  // Update events
+  EVENT_UPDATE_STATUS = 'event:update:status',
+  EVENT_UPDATE_AVAILABLE = 'event:update:available',
+  EVENT_UPDATE_DOWNLOADED = 'event:update:downloaded',
 }
 
 /**
@@ -182,7 +265,7 @@ export interface ConfigValidationResult {
 /**
  * Setup wizard step
  */
-export type SetupStep = 'welcome' | 'unifi' | 'doordeck' | 'doors' | 'complete';
+export type SetupStep = 'welcome' | 'unifi' | 'doordeck' | 'mapping' | 'complete';
 
 /**
  * Setup wizard state

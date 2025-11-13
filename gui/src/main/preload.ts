@@ -18,6 +18,8 @@ const bridgeAPI: BridgeAPI = {
   validateConfig: (config) => ipcRenderer.invoke(IPCChannel.VALIDATE_CONFIG, config),
 
   // Service control
+  installService: () => ipcRenderer.invoke(IPCChannel.SERVICE_INSTALL),
+  uninstallService: () => ipcRenderer.invoke(IPCChannel.SERVICE_UNINSTALL),
   startService: () => ipcRenderer.invoke(IPCChannel.SERVICE_START),
   stopService: () => ipcRenderer.invoke(IPCChannel.SERVICE_STOP),
   restartService: () => ipcRenderer.invoke(IPCChannel.SERVICE_RESTART),
@@ -28,8 +30,14 @@ const bridgeAPI: BridgeAPI = {
   listDoors: () => ipcRenderer.invoke(IPCChannel.DOORS_LIST),
   discoverDoors: () => ipcRenderer.invoke(IPCChannel.DOORS_DISCOVER),
   unlockDoor: (doorId) => ipcRenderer.invoke(IPCChannel.DOOR_UNLOCK, doorId),
-  mapDoor: (mapping) => ipcRenderer.invoke(IPCChannel.DOOR_MAP, mapping),
-  unmapDoor: (unifiDoorId) => ipcRenderer.invoke(IPCChannel.DOOR_UNMAP, unifiDoorId),
+
+  // Door Mappings
+  listMappings: () => ipcRenderer.invoke(IPCChannel.MAPPINGS_LIST),
+  getMapping: (id) => ipcRenderer.invoke(IPCChannel.MAPPINGS_GET, id),
+  createMapping: (data) => ipcRenderer.invoke(IPCChannel.MAPPINGS_CREATE, data),
+  updateMapping: (id, updates) => ipcRenderer.invoke(IPCChannel.MAPPINGS_UPDATE, { id, updates }),
+  deleteMapping: (id) => ipcRenderer.invoke(IPCChannel.MAPPINGS_DELETE, id),
+  listDoordeckLocks: () => ipcRenderer.invoke(IPCChannel.DOORDECK_LOCKS_LIST),
 
   // Logs
   getLogs: (limit) => ipcRenderer.invoke(IPCChannel.LOGS_GET, limit),
@@ -65,6 +73,31 @@ const bridgeAPI: BridgeAPI = {
   testDoordeckConnection: (config) => ipcRenderer.invoke(IPCChannel.SETUP_TEST_DOORDECK, config),
   discoverDoorsWithConfig: (config) => ipcRenderer.invoke(IPCChannel.SETUP_DISCOVER_DOORS, config),
   completeSetup: (config) => ipcRenderer.invoke(IPCChannel.SETUP_COMPLETE, config),
+
+  // Auto-update
+  checkForUpdates: () => ipcRenderer.invoke(IPCChannel.UPDATE_CHECK),
+  downloadUpdate: () => ipcRenderer.invoke(IPCChannel.UPDATE_DOWNLOAD),
+  installUpdate: () => ipcRenderer.invoke(IPCChannel.UPDATE_INSTALL),
+  getUpdateStatus: () => ipcRenderer.invoke(IPCChannel.UPDATE_GET_STATUS),
+
+  // Update event subscriptions
+  onUpdateStatus: (callback) => {
+    const listener = (_event: any, status: any) => callback(status);
+    ipcRenderer.on(IPCChannel.EVENT_UPDATE_STATUS, listener);
+    return () => ipcRenderer.removeListener(IPCChannel.EVENT_UPDATE_STATUS, listener);
+  },
+
+  onUpdateAvailable: (callback) => {
+    const listener = (_event: any, info: any) => callback(info);
+    ipcRenderer.on(IPCChannel.EVENT_UPDATE_AVAILABLE, listener);
+    return () => ipcRenderer.removeListener(IPCChannel.EVENT_UPDATE_AVAILABLE, listener);
+  },
+
+  onUpdateDownloaded: (callback) => {
+    const listener = (_event: any, info: any) => callback(info);
+    ipcRenderer.on(IPCChannel.EVENT_UPDATE_DOWNLOADED, listener);
+    return () => ipcRenderer.removeListener(IPCChannel.EVENT_UPDATE_DOWNLOADED, listener);
+  },
 };
 
 /**

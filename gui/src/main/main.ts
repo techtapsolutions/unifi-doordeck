@@ -107,8 +107,14 @@ app.whenReady().then(() => {
   // Create system tray
   createTray();
 
-  // Setup IPC handlers
+  // Setup IPC handlers (this also initializes the update manager with the main window)
   setupIPC(ipcMain, mainWindow);
+
+  // Check for updates on startup (after 5 seconds delay)
+  // Note: The update manager is already initialized with the main window in setupIPC
+  const { getUpdateManager } = require('./update-manager');
+  const updateManager = getUpdateManager();
+  updateManager.checkForUpdatesOnStartup(5000);
 
   // macOS: Re-create window when dock icon clicked
   app.on('activate', () => {

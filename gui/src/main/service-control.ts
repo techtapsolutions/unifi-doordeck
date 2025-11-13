@@ -1,0 +1,219 @@
+/**
+ * Windows Service Control
+ * Manages the UniFi-Doordeck Bridge Windows Service
+ */
+
+import { Service } from 'node-windows';
+import { join } from 'path';
+import { app } from 'electron';
+
+const SERVICE_NAME = 'UniFi-Doordeck Bridge';
+
+/**
+ * Get the service script path
+ */
+function getServiceScriptPath(): string {
+  // In production, the service script is in the app's resources
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'service', 'bridge-service.js');
+  } else {
+    return join(__dirname, '..', 'service', 'bridge-service.js');
+  }
+}
+
+/**
+ * Get service instance
+ */
+function getService(): Service {
+  return new Service({
+    name: SERVICE_NAME,
+    description: 'Bridge service between UniFi Access and Doordeck Cloud',
+    script: getServiceScriptPath(),
+    nodeOptions: ['--max_old_space_size=4096'],
+    env: [{
+      name: 'NODE_ENV',
+      value: 'production'
+    }]
+  });
+}
+
+/**
+ * Check if service is installed
+ */
+export function isServiceInstalled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const svc = getService();
+      resolve(svc.exists);
+    } catch (error) {
+      resolve(false);
+    }
+  });
+}
+
+/**
+ * Install the service
+ */
+export function installService(): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    try {
+      const svc = getService();
+
+      if (svc.exists) {
+        resolve({ success: false, error: 'Service is already installed' });
+        return;
+      }
+
+      svc.on('install', () => {
+        resolve({ success: true });
+      });
+
+      svc.on('error', (err: Error) => {
+        resolve({ success: false, error: err.message });
+      });
+
+      svc.on('alreadyinstalled', () => {
+        resolve({ success: false, error: 'Service is already installed' });
+      });
+
+      svc.install();
+    } catch (error) {
+      resolve({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to install service'
+      });
+    }
+  });
+}
+
+/**
+ * Uninstall the service
+ */
+export function uninstallService(): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    try {
+      const svc = getService();
+
+      if (!svc.exists) {
+        resolve({ success: false, error: 'Service is not installed' });
+        return;
+      }
+
+      let stopped = false;
+
+      svc.on('stop', () => {
+        stopped = true;
+        svc.uninstall();
+      });
+
+      svc.on('uninstall', () => {
+        resolve({ success: true });
+      });
+
+      svc.on('error', (err: Error) => {
+        resolve({ success: false, error: err.message });
+      });
+
+      svc.on('invalidinstallation', () => {
+        resolve({ success: false, error: 'Service is not properly installed' });
+      });
+
+      // Stop first, then uninstall
+      if (!stopped) {
+        svc.stop();
+      }
+    } catch (error) {
+      resolve({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to uninstall service'
+      });
+    }
+  });
+}
+
+/**
+ * Start the service
+ */
+export function startService(): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    try {
+      const svc = getService();
+
+      if (!svc.exists) {
+        resolve({ success: false, error: 'Service is not installed' });
+        return;
+      }
+
+      svc.on('start', () => {
+        resolve({ success: true });
+      });
+
+      svc.on('error', (err: Error) => {
+        resolve({ success: false, error: err.message });
+      });
+
+      svc.on('alreadyrunning', () => {
+        resolve({ success: true });
+      });
+
+      svc.start();
+    } catch (error) {
+      resolve({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to start service'
+      });
+    }
+  });
+}
+
+/**
+ * Stop the service
+ */
+export function stopService(): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    try {
+      const svc = getService();
+
+      if (!svc.exists) {
+        resolve({ success: false, error: 'Service is not installed' });
+        return;
+      }
+
+      svc.on('stop', () => {
+        resolve({ success: true });
+      });
+
+      svc.on('error', (err: Error) => {
+        resolve({ success: false, error: err.message });
+      });
+
+      svc.on('alreadystopped', () => {
+        resolve({ success: true });
+      });
+
+      svc.stop();
+    } catch (error) {
+      resolve({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to stop service'
+      });
+    }
+  });
+}
+
+/**
+ * Restart the service
+ */
+export async function restartService(): Promise<{ success: boolean; error?: string }> {
+  // Stop first
+  const stopResult = await stopService();
+  if (!stopResult.success) {
+    return stopResult;
+  }
+
+  // Wait a bit for clean shutdown
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Start again
+  return startService();
+}

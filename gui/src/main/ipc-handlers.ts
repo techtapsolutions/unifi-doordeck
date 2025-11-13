@@ -10,15 +10,26 @@ import type {
   ConfigValidationResult,
   Door,
   DoorMapping,
+  DoordeckLock,
   LogEntry,
   ServiceHealth,
   UniFiConfig,
   DoordeckConfig,
+  UpdateStatus,
 } from '../shared/types';
 import { IPCChannel } from '../shared/types';
 import { BridgeServiceClient } from './bridge-client';
 import { ConfigManager } from './config-manager';
-import { testUniFiConnection, testDoordeckConnection, discoverUniFiDoors } from './connection-testers';
+import {
+  testUniFiConnection,
+  testDoordeckConnection,
+  discoverUniFiDoors,
+  discoverDoordeckLocks,
+  unlockUniFiDoor,
+} from './connection-testers';
+import { log, getLogPath } from './logger';
+import * as doorMappingStore from './door-mapping-store';
+import { getUpdateManager } from './update-manager';
 
 let bridgeClient: BridgeServiceClient;
 let configManager: ConfigManager;
@@ -37,6 +48,8 @@ export function setupIPC(ipcMain: IpcMain, mainWindow: BrowserWindow): void {
   ipcMain.handle(IPCChannel.VALIDATE_CONFIG, handleValidateConfig);
 
   // Service control handlers
+  ipcMain.handle(IPCChannel.SERVICE_INSTALL, handleServiceInstall);
+  ipcMain.handle(IPCChannel.SERVICE_UNINSTALL, handleServiceUninstall);
   ipcMain.handle(IPCChannel.SERVICE_START, handleServiceStart);
   ipcMain.handle(IPCChannel.SERVICE_STOP, handleServiceStop);
   ipcMain.handle(IPCChannel.SERVICE_RESTART, handleServiceRestart);
@@ -47,8 +60,14 @@ export function setupIPC(ipcMain: IpcMain, mainWindow: BrowserWindow): void {
   ipcMain.handle(IPCChannel.DOORS_LIST, handleDoorsList);
   ipcMain.handle(IPCChannel.DOORS_DISCOVER, handleDoorsDiscover);
   ipcMain.handle(IPCChannel.DOOR_UNLOCK, handleDoorUnlock);
-  ipcMain.handle(IPCChannel.DOOR_MAP, handleDoorMap);
-  ipcMain.handle(IPCChannel.DOOR_UNMAP, handleDoorUnmap);
+
+  // Door Mapping handlers
+  ipcMain.handle(IPCChannel.MAPPINGS_LIST, handleMappingsList);
+  ipcMain.handle(IPCChannel.MAPPINGS_GET, handleMappingsGet);
+  ipcMain.handle(IPCChannel.MAPPINGS_CREATE, handleMappingsCreate);
+  ipcMain.handle(IPCChannel.MAPPINGS_UPDATE, handleMappingsUpdate);
+  ipcMain.handle(IPCChannel.MAPPINGS_DELETE, handleMappingsDelete);
+  ipcMain.handle(IPCChannel.DOORDECK_LOCKS_LIST, handleDoordeckLocksList);
 
   // Log handlers
   ipcMain.handle(IPCChannel.LOGS_GET, handleLogsGet);
@@ -59,6 +78,16 @@ export function setupIPC(ipcMain: IpcMain, mainWindow: BrowserWindow): void {
   ipcMain.handle(IPCChannel.SETUP_TEST_DOORDECK, handleTestDoordeck);
   ipcMain.handle(IPCChannel.SETUP_DISCOVER_DOORS, handleDiscoverDoorsWithConfig);
   ipcMain.handle(IPCChannel.SETUP_COMPLETE, handleSetupComplete);
+
+  // Auto-update handlers
+  ipcMain.handle(IPCChannel.UPDATE_CHECK, handleUpdateCheck);
+  ipcMain.handle(IPCChannel.UPDATE_DOWNLOAD, handleUpdateDownload);
+  ipcMain.handle(IPCChannel.UPDATE_INSTALL, handleUpdateInstall);
+  ipcMain.handle(IPCChannel.UPDATE_GET_STATUS, handleUpdateGetStatus);
+
+  // Initialize update manager
+  const updateManager = getUpdateManager();
+  updateManager.setMainWindow(mainWindow);
 
   // Setup event polling to push updates to renderer
   startEventPolling(mainWindow);
@@ -112,6 +141,30 @@ async function handleValidateConfig(
 /**
  * Service control handlers
  */
+async function handleServiceInstall(): Promise<APIResponse<void>> {
+  try {
+    await bridgeClient.installService();
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to install service',
+    };
+  }
+}
+
+async function handleServiceUninstall(): Promise<APIResponse<void>> {
+  try {
+    await bridgeClient.uninstallService();
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to uninstall service',
+    };
+  }
+}
+
 async function handleServiceStart(): Promise<APIResponse<void>> {
   try {
     await bridgeClient.startService();
@@ -240,37 +293,183 @@ async function handleDoorsDiscover(): Promise<APIResponse<Door[]>> {
 }
 
 async function handleDoorUnlock(_event: any, doorId: string): Promise<APIResponse<void>> {
+  log('INFO', `handleDoorUnlock called for door: ${doorId}`);
+  log('INFO', `Log file location: ${getLogPath()}`);
+
   try {
-    await bridgeClient.unlockDoor(doorId);
-    return { success: true };
+    // Try bridge service first
+    try {
+      log('INFO', 'Attempting unlock via bridge service...');
+      await bridgeClient.unlockDoor(doorId);
+      log('INFO', 'Door unlocked successfully via bridge service');
+      return { success: true };
+    } catch (bridgeError) {
+      log('WARN', 'Bridge service unlock failed, trying direct unlock...', bridgeError);
+
+      // Bridge service not available, try direct unlock
+      const config = await configManager.getConfig();
+      log('INFO', 'Loaded config', {
+        hasConfig: !!config,
+        hasUnifi: !!(config && config.unifi),
+        hasHost: !!(config && config.unifi && config.unifi.host),
+        hasApiKey: !!(config && config.unifi && config.unifi.apiKey),
+      });
+
+      if (config && config.unifi && config.unifi.host && config.unifi.apiKey) {
+        log('INFO', 'Using standalone door unlock');
+        log('INFO', `Unlocking door with location ID: ${doorId}`);
+
+        // Use the door location ID directly (no need to look up device ID)
+        const result = await unlockUniFiDoor(config.unifi, doorId);
+        log('INFO', 'Unlock result', { success: result.success, error: result.error });
+
+        if (result.success) {
+          log('INFO', 'Door unlocked successfully via direct connection');
+          return { success: true };
+        } else {
+          log('ERROR', 'Direct unlock failed', result.error);
+          return {
+            success: false,
+            error: `${result.error}\n\nLog file: ${getLogPath()}`,
+          };
+        }
+      } else {
+        log('ERROR', 'No UniFi config available');
+        return {
+          success: false,
+          error: `UniFi configuration not available.\n\nLog file: ${getLogPath()}`,
+        };
+      }
+    }
   } catch (error) {
+    log('ERROR', 'Exception in handleDoorUnlock', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to unlock door',
+      error: `${error instanceof Error ? error.message : 'Failed to unlock door'}\n\nLog file: ${getLogPath()}`,
     };
   }
 }
 
-async function handleDoorMap(_event: any, mapping: DoorMapping): Promise<APIResponse<void>> {
+/**
+ * Door Mapping handlers
+ */
+async function handleMappingsList(): Promise<APIResponse<DoorMapping[]>> {
   try {
-    await bridgeClient.mapDoor(mapping);
-    return { success: true };
+    const mappings = doorMappingStore.getMappings();
+    return { success: true, data: mappings };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to map door',
+      error: error instanceof Error ? error.message : 'Failed to list mappings',
     };
   }
 }
 
-async function handleDoorUnmap(_event: any, unifiDoorId: string): Promise<APIResponse<void>> {
+async function handleMappingsGet(
+  _event: any,
+  id: string
+): Promise<APIResponse<DoorMapping>> {
   try {
-    await bridgeClient.unmapDoor(unifiDoorId);
+    const mapping = doorMappingStore.getMappingById(id);
+    if (mapping) {
+      return { success: true, data: mapping };
+    } else {
+      return {
+        success: false,
+        error: 'Mapping not found',
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get mapping',
+    };
+  }
+}
+
+async function handleMappingsCreate(
+  _event: any,
+  data: {
+    unifiDoorId: string;
+    unifiDoorName: string;
+    doordeckLockId: string;
+    doordeckLockName: string;
+    siteId?: string;
+  }
+): Promise<APIResponse<DoorMapping>> {
+  try {
+    const mapping = doorMappingStore.createMapping(
+      data.unifiDoorId,
+      data.unifiDoorName,
+      data.doordeckLockId,
+      data.doordeckLockName,
+      data.siteId
+    );
+    return { success: true, data: mapping };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create mapping',
+    };
+  }
+}
+
+async function handleMappingsUpdate(
+  _event: any,
+  data: {
+    id: string;
+    updates: Partial<Omit<DoorMapping, 'id' | 'createdAt'>>;
+  }
+): Promise<APIResponse<DoorMapping>> {
+  try {
+    const mapping = doorMappingStore.updateMapping(data.id, data.updates);
+    return { success: true, data: mapping };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update mapping',
+    };
+  }
+}
+
+async function handleMappingsDelete(
+  _event: any,
+  id: string
+): Promise<APIResponse<void>> {
+  try {
+    doorMappingStore.deleteMapping(id);
     return { success: true };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to unmap door',
+      error: error instanceof Error ? error.message : 'Failed to delete mapping',
+    };
+  }
+}
+
+async function handleDoordeckLocksList(): Promise<APIResponse<DoordeckLock[]>> {
+  try {
+    const config = await configManager.getConfig();
+    if (!config || !config.doordeck) {
+      return {
+        success: false,
+        error: 'Doordeck not configured',
+      };
+    }
+
+    const result = await discoverDoordeckLocks(config.doordeck);
+    if (result.success && result.locks) {
+      return { success: true, data: result.locks };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Failed to discover Doordeck locks',
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to list Doordeck locks',
     };
   }
 }
@@ -391,12 +590,69 @@ async function handleSetupComplete(
 ): Promise<APIResponse<void>> {
   try {
     await configManager.setConfig(config);
-    await bridgeClient.startService();
+    // Note: Service must be started manually via system service manager
+    // or through the GUI after setup completes
+    console.log('[IPC] Setup complete - configuration saved');
     return { success: true };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to complete setup',
+    };
+  }
+}
+
+/**
+ * Auto-update handlers
+ */
+async function handleUpdateCheck(): Promise<APIResponse<UpdateStatus>> {
+  try {
+    const updateManager = getUpdateManager();
+    const status = await updateManager.checkForUpdates();
+    return { success: true, data: status };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to check for updates',
+    };
+  }
+}
+
+async function handleUpdateDownload(): Promise<APIResponse<void>> {
+  try {
+    const updateManager = getUpdateManager();
+    await updateManager.downloadUpdate();
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to download update',
+    };
+  }
+}
+
+async function handleUpdateInstall(): Promise<APIResponse<void>> {
+  try {
+    const updateManager = getUpdateManager();
+    updateManager.quitAndInstall();
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to install update',
+    };
+  }
+}
+
+async function handleUpdateGetStatus(): Promise<APIResponse<UpdateStatus>> {
+  try {
+    const updateManager = getUpdateManager();
+    const status = updateManager.getStatus();
+    return { success: true, data: status };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get update status',
     };
   }
 }
