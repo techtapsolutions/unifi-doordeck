@@ -1,6 +1,6 @@
 {
   "name": "unifi-doordeck-bridge-gui",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Native Windows GUI for UniFi-Doordeck Bridge configuration and monitoring",
   "main": "dist/main/main.js",
   "scripts": {
@@ -62,7 +62,7 @@
   },
   "build": {
     "appId": "com.techtap.unifi-doordeck-bridge",
-    "productName": "UniFi-Doordeck Bridge",
+    "productName": "UniFi-Doordeck-Bridge",
     "copyright": "Copyright © 2025",
     "directories": {
       "output": "release",
@@ -92,8 +92,7 @@
       ],
       "icon": "assets/icon.ico",
       "publisherName": "Tech Tap Solutions",
-      "verifyUpdateCodeSignature": false,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
@@ -102,6 +101,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "UniFi-Doordeck Bridge",
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeader": "assets/installer-header.bmp",
