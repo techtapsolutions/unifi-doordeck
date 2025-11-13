@@ -15,7 +15,8 @@ const SERVICE_NAME = 'UniFi-Doordeck Bridge';
 function getServiceScriptPath(): string {
   // In production, the service script is in the app's resources
   if (app.isPackaged) {
-    return join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'service', 'bridge-service.js');
+    // Since asar is disabled, files are in 'app' directory, not 'app.asar.unpacked'
+    return join(process.resourcesPath, 'app', 'dist', 'service', 'bridge-service.js');
   } else {
     return join(__dirname, '..', 'service', 'bridge-service.js');
   }
