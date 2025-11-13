@@ -259,9 +259,22 @@ export default function UpdateNotification({ onClose }: UpdateNotificationProps)
       <div className="update-error-banner">
         <span className="error-icon">⚠️</span>
         <span>{error}</span>
-        <button className="btn btn-small btn-secondary" onClick={handleCheckForUpdates}>
-          Retry
-        </button>
+        <div className="update-error-actions">
+          <button className="btn btn-small btn-secondary" onClick={handleCheckForUpdates}>
+            Retry
+          </button>
+          <button
+            className="btn btn-small btn-secondary"
+            onClick={() => {
+              setError(null);
+              if (onClose) {
+                onClose();
+              }
+            }}
+          >
+            Close
+          </button>
+        </div>
       </div>
     );
   }
