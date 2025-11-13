@@ -200,6 +200,7 @@ export enum IPCChannel {
   SERVICE_RESTART = 'service:restart',
   SERVICE_STATUS = 'service:status',
   SERVICE_HEALTH = 'service:health',
+  SERVICE_IS_INSTALLED = 'service:is-installed',
 
   // Doors
   DOORS_LIST = 'doors:list',

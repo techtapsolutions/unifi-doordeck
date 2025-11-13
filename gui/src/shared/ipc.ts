@@ -36,6 +36,7 @@ export interface BridgeAPI {
   restartService: () => Promise<APIResponse<void>>;
   getServiceStatus: () => Promise<APIResponse<string>>;
   getServiceHealth: () => Promise<APIResponse<ServiceHealth>>;
+  isServiceInstalled: () => Promise<APIResponse<boolean>>;
 
   // Doors
   listDoors: () => Promise<APIResponse<Door[]>>;

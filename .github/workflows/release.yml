@@ -48,21 +48,23 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           artifacts: |
-            gui/release/UniFi-Doordeck Bridge-Setup-0.1.1.exe
-            gui/release/UniFi-Doordeck Bridge-Portable-0.1.1.exe
-            gui/release/UniFi-Doordeck Bridge-Setup-0.1.1.exe.blockmap
+            gui/release/UniFi-Doordeck Bridge-Setup-*.exe
+            gui/release/UniFi-Doordeck Bridge-Portable-*.exe
+            gui/release/UniFi-Doordeck Bridge-Setup-*.exe.blockmap
             gui/release/latest.yml
           name: UniFi-Doordeck Bridge ${{ github.ref_name }}
           body: |
             Automated release for version ${{ github.ref_name }}
 
-            ## Changes
-            - Fixed update checking infinite loop
-            - Added close button to update error notifications
-            - Configured automated releases via GitHub Actions
+            ## Changes in this release
+            - Added Service Management tab in Settings for easy service installation
+            - Fixed service status detection to properly show "Install Service" button
+            - Improved service installation workflow with clear admin privilege warnings
 
             ## Installation
-            Download `UniFi-Doordeck-Bridge-Setup-0.1.1.exe` for the installer version, or `UniFi-Doordeck-Bridge-Portable-0.1.1.exe` for the portable version.
+            Download the Setup executable for the installer version, or the Portable executable for the portable version.
+
+            **Note:** Service installation requires administrator privileges. Right-click the app and select "Run as administrator" to install the service.
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}

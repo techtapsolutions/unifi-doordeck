@@ -25,6 +25,7 @@ const bridgeAPI: BridgeAPI = {
   restartService: () => ipcRenderer.invoke(IPCChannel.SERVICE_RESTART),
   getServiceStatus: () => ipcRenderer.invoke(IPCChannel.SERVICE_STATUS),
   getServiceHealth: () => ipcRenderer.invoke(IPCChannel.SERVICE_HEALTH),
+  isServiceInstalled: () => ipcRenderer.invoke(IPCChannel.SERVICE_IS_INSTALLED),
 
   // Doors
   listDoors: () => ipcRenderer.invoke(IPCChannel.DOORS_LIST),

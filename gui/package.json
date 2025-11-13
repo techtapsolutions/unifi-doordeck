@@ -1,6 +1,6 @@
 {
   "name": "unifi-doordeck-bridge-gui",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Native Windows GUI for UniFi-Doordeck Bridge configuration and monitoring",
   "main": "dist/main/main.js",
   "scripts": {

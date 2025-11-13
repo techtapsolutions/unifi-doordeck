@@ -55,6 +55,7 @@ export function setupIPC(ipcMain: IpcMain, mainWindow: BrowserWindow): void {
   ipcMain.handle(IPCChannel.SERVICE_RESTART, handleServiceRestart);
   ipcMain.handle(IPCChannel.SERVICE_STATUS, handleServiceStatus);
   ipcMain.handle(IPCChannel.SERVICE_HEALTH, handleServiceHealth);
+  ipcMain.handle(IPCChannel.SERVICE_IS_INSTALLED, handleServiceIsInstalled);
 
   // Door handlers
   ipcMain.handle(IPCChannel.DOORS_LIST, handleDoorsList);
@@ -221,6 +222,18 @@ async function handleServiceHealth(): Promise<APIResponse<ServiceHealth>> {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get service health',
+    };
+  }
+}
+
+async function handleServiceIsInstalled(): Promise<APIResponse<boolean>> {
+  try {
+    const isInstalled = await bridgeClient.isServiceInstalled();
+    return { success: true, data: isInstalled };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to check service installation',
     };
   }
 }

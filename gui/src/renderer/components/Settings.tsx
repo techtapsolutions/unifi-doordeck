@@ -16,12 +16,15 @@ export default function Settings({ onClose, onSave }: SettingsProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'unifi' | 'doordeck' | 'advanced'>('unifi');
+  const [activeTab, setActiveTab] = useState<'unifi' | 'doordeck' | 'service' | 'advanced'>('unifi');
   const [discovering, setDiscovering] = useState(false);
   const [discoveredDoors, setDiscoveredDoors] = useState<Door[] | null>(null);
+  const [serviceStatus, setServiceStatus] = useState<string>('unknown');
+  const [serviceOperating, setServiceOperating] = useState(false);
 
   useEffect(() => {
     loadConfig();
+    loadServiceStatus();
   }, []);
 
   async function loadConfig() {
@@ -114,6 +117,134 @@ export default function Settings({ onClose, onSave }: SettingsProps) {
     }
   }
 
+  async function loadServiceStatus() {
+    try {
+      // First check if service is installed
+      const installedResponse = await window.bridge.isServiceInstalled();
+      if (!installedResponse.success || !installedResponse.data) {
+        // Service is not installed
+        setServiceStatus('not installed');
+        return;
+      }
+
+      // Service is installed, now check if it's running
+      const healthResponse = await window.bridge.getServiceHealth();
+      if (healthResponse.success && healthResponse.data) {
+        setServiceStatus(healthResponse.data.status);
+      } else {
+        // Service is installed but not running
+        setServiceStatus('stopped');
+      }
+    } catch (err) {
+      setServiceStatus('not installed');
+    }
+  }
+
+  async function handleInstallService() {
+    setServiceOperating(true);
+    setError(null);
+
+    try {
+      const response = await window.bridge.installService();
+      if (response.success) {
+        alert('Service installed successfully! You can now start it.');
+        await loadServiceStatus();
+      } else {
+        setError(response.error || 'Failed to install service');
+        alert(`Failed to install service: ${response.error}\n\nMake sure you are running the application as Administrator.`);
+      }
+    } catch (err) {
+      setError('Failed to install service');
+      alert('Failed to install service. Make sure you are running as Administrator.');
+    } finally {
+      setServiceOperating(false);
+    }
+  }
+
+  async function handleUninstallService() {
+    if (!confirm('Are you sure you want to uninstall the service? This will stop the bridge service.')) {
+      return;
+    }
+
+    setServiceOperating(true);
+    setError(null);
+
+    try {
+      const response = await window.bridge.uninstallService();
+      if (response.success) {
+        alert('Service uninstalled successfully!');
+        await loadServiceStatus();
+      } else {
+        setError(response.error || 'Failed to uninstall service');
+        alert(`Failed to uninstall service: ${response.error}`);
+      }
+    } catch (err) {
+      setError('Failed to uninstall service');
+    } finally {
+      setServiceOperating(false);
+    }
+  }
+
+  async function handleStartService() {
+    setServiceOperating(true);
+    setError(null);
+
+    try {
+      const response = await window.bridge.startService();
+      if (response.success) {
+        alert('Service started successfully!');
+        await loadServiceStatus();
+      } else {
+        setError(response.error || 'Failed to start service');
+        alert(`Failed to start service: ${response.error}`);
+      }
+    } catch (err) {
+      setError('Failed to start service');
+    } finally {
+      setServiceOperating(false);
+    }
+  }
+
+  async function handleStopService() {
+    setServiceOperating(true);
+    setError(null);
+
+    try {
+      const response = await window.bridge.stopService();
+      if (response.success) {
+        alert('Service stopped successfully!');
+        await loadServiceStatus();
+      } else {
+        setError(response.error || 'Failed to stop service');
+        alert(`Failed to stop service: ${response.error}`);
+      }
+    } catch (err) {
+      setError('Failed to stop service');
+    } finally {
+      setServiceOperating(false);
+    }
+  }
+
+  async function handleRestartService() {
+    setServiceOperating(true);
+    setError(null);
+
+    try {
+      const response = await window.bridge.restartService();
+      if (response.success) {
+        alert('Service restarted successfully!');
+        await loadServiceStatus();
+      } else {
+        setError(response.error || 'Failed to restart service');
+        alert(`Failed to restart service: ${response.error}`);
+      }
+    } catch (err) {
+      setError('Failed to restart service');
+    } finally {
+      setServiceOperating(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="modal-overlay">
@@ -164,6 +295,12 @@ export default function Settings({ onClose, onSave }: SettingsProps) {
             onClick={() => setActiveTab('doordeck')}
           >
             Doordeck
+          </button>
+          <button
+            className={`tab ${activeTab === 'service' ? 'active' : ''}`}
+            onClick={() => setActiveTab('service')}
+          >
+            Service
           </button>
           <button
             className={`tab ${activeTab === 'advanced' ? 'active' : ''}`}
@@ -333,6 +470,100 @@ export default function Settings({ onClose, onSave }: SettingsProps) {
               <button className="btn btn-secondary" onClick={handleTestDoordeck}>
                 Test Connection
               </button>
+            </div>
+          )}
+
+          {activeTab === 'service' && (
+            <div className="settings-section">
+              <h3>Windows Service Management</h3>
+
+              <div className="service-status-card">
+                <div className="status-item">
+                  <span className="label">Service Status:</span>
+                  <span className={`status-badge ${serviceStatus === 'running' ? 'running' : serviceStatus === 'stopped' ? 'stopped' : 'error'}`}>
+                    {serviceStatus === 'not installed' ? 'Not Installed' :
+                     serviceStatus === 'running' ? 'Running' :
+                     serviceStatus === 'stopped' ? 'Stopped' :
+                     serviceStatus.charAt(0).toUpperCase() + serviceStatus.slice(1)}
+                  </span>
+                </div>
+              </div>
+
+              <p className="help-text" style={{ marginTop: '16px', marginBottom: '16px' }}>
+                The Windows service runs the bridge in the background and handles webhook events from Doordeck.
+                {serviceStatus === 'not installed' && (
+                  <><br /><br /><strong>⚠️ Administrator privileges required:</strong> Installing a Windows service requires running this application as Administrator.</>
+                )}
+              </p>
+
+              {serviceStatus === 'not installed' && (
+                <div className="button-group">
+                  <button
+                    className="btn btn-success"
+                    onClick={handleInstallService}
+                    disabled={serviceOperating}
+                  >
+                    {serviceOperating ? 'Installing...' : 'Install Service'}
+                  </button>
+                </div>
+              )}
+
+              {serviceStatus !== 'not installed' && (
+                <>
+                  <div className="button-group" style={{ marginBottom: '12px' }}>
+                    <button
+                      className="btn btn-success"
+                      onClick={handleStartService}
+                      disabled={serviceOperating || serviceStatus === 'running'}
+                    >
+                      {serviceOperating ? 'Starting...' : 'Start Service'}
+                    </button>
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleStopService}
+                      disabled={serviceOperating || serviceStatus === 'stopped'}
+                    >
+                      {serviceOperating ? 'Stopping...' : 'Stop Service'}
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleRestartService}
+                      disabled={serviceOperating || serviceStatus !== 'running'}
+                    >
+                      {serviceOperating ? 'Restarting...' : 'Restart Service'}
+                    </button>
+                  </div>
+
+                  <div className="button-group">
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleUninstallService}
+                      disabled={serviceOperating}
+                    >
+                      {serviceOperating ? 'Uninstalling...' : 'Uninstall Service'}
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={loadServiceStatus}
+                      disabled={serviceOperating}
+                    >
+                      Refresh Status
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <hr style={{ margin: '24px 0', borderColor: '#e5e7eb' }} />
+
+              <h3>Service Information</h3>
+              <div className="info-section">
+                <p><strong>Service Name:</strong> UniFi-Doordeck Bridge</p>
+                <p><strong>Description:</strong> Bridge service between UniFi Access and Doordeck Cloud</p>
+                <p><strong>Port:</strong> 34512</p>
+                <p style={{ marginTop: '12px', fontSize: '14px', color: '#6b7280' }}>
+                  You can also manage this service through Windows Services (services.msc).
+                </p>
+              </div>
             </div>
           )}
 
