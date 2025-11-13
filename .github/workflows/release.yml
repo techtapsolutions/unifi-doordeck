@@ -41,23 +41,16 @@ jobs:
             Get-ChildItem -Path . | Format-Table Name
           }
 
-      - name: Create Release and Upload Files
-        working-directory: gui
-        shell: pwsh
+      - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tagName = "${{ github.ref_name }}"
-          $files = Get-ChildItem -Path release -Filter *.exe -File
-          $files += Get-ChildItem -Path release -Filter *.blockmap -File
-          $files += Get-ChildItem -Path release -Filter latest.yml -File
-
-          $fileArgs = $files | ForEach-Object { $_.FullName }
-
-          gh release create $tagName `
-            --title "UniFi-Doordeck Bridge $tagName" `
-            --notes "Automated release for version $tagName" `
-            @fileArgs
+          gh release create ${{ github.ref_name }} \
+            --title "UniFi-Doordeck Bridge ${{ github.ref_name }}" \
+            --notes "Automated release for version ${{ github.ref_name }}" \
+            gui/release/*.exe \
+            gui/release/*.blockmap \
+            gui/release/latest.yml
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
