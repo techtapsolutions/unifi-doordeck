@@ -6,20 +6,52 @@
 import { Service } from 'node-windows';
 import { join } from 'path';
 import { app } from 'electron';
+import { mkdirSync, existsSync, copyFileSync } from 'fs';
 
 const SERVICE_NAME = 'UniFi-Doordeck Bridge';
 
 /**
- * Get the service script path
+ * Get the service data directory in ProgramData
+ * This is writable by services and used for daemon files
  */
-function getServiceScriptPath(): string {
-  // In production, the service script is in the app's resources
+function getServiceDataDirectory(): string {
+  const programData = process.env.ProgramData || 'C:\\ProgramData';
+  const dataDir = join(programData, 'Tech Tap Solutions', 'UniFi-Doordeck Bridge');
+
+  // Ensure the directory exists
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
+  }
+
+  return dataDir;
+}
+
+/**
+ * Get the source service script path (in Program Files)
+ */
+function getSourceServiceScriptPath(): string {
   if (app.isPackaged) {
-    // Since asar is disabled, files are in 'app' directory, not 'app.asar.unpacked'
     return join(process.resourcesPath, 'app', 'dist', 'service', 'bridge-service.js');
   } else {
     return join(__dirname, '..', 'service', 'bridge-service.js');
   }
+}
+
+/**
+ * Get the service script path in the writable data directory
+ * Copies the script from Program Files to ProgramData if needed
+ */
+function getServiceScriptPath(): string {
+  const sourceScript = getSourceServiceScriptPath();
+  const dataDir = getServiceDataDirectory();
+  const targetScript = join(dataDir, 'bridge-service.js');
+
+  // Copy the script to the writable location if it doesn't exist or is outdated
+  if (!existsSync(targetScript)) {
+    copyFileSync(sourceScript, targetScript);
+  }
+
+  return targetScript;
 }
 
 /**
