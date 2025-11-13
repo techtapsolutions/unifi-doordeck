@@ -26,11 +26,21 @@ jobs:
         working-directory: gui
         run: npm run build
 
-      - name: Package and publish
+      - name: Package application
         working-directory: gui
+        run: npx electron-builder --win --publish never
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            gui/release/*.exe
+            gui/release/*.blockmap
+            gui/release/latest.yml
+          draft: false
+          prerelease: false
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win --publish always
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
